@@ -1,0 +1,91 @@
+version: '3.3'
+services:
+  ### MySQL Container
+  mysql:
+    container_name: mysql
+    build:
+      args:
+        - MYSQL_DATABASE=${MYSQL_DATABASE}
+        - MYSQL_USER=${MYSQL_USER}
+        - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+        - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    ports:
+      - 3306:3306
+    volumes:
+      - ./volumes/mysql-volume:/var/lib/mysql
+    networks:
+      - mysql_go_net
+  ### Python Container (Scrap)
+  scrap:
+    build: ./app/scrap
+    container_name: scrap
+    restart: always
+    ports:
+      - 8081:8000
+    networks:
+      - rabbitmq_go_net
+    depends_on:
+      - mysql
+      - rabbitmq
+  ### Python Container (Queue)
+  queue:
+    build: ./app/queue
+    container_name: queue
+    restart: always
+    ports:
+      - 8083:8082
+    depends_on:
+      - mysql
+      - rabbitmq
+      - scrap
+    networks:
+      - rabbitmq_go_net
+      - mysql_go_net
+  ### Python Container (Clean)
+  clean:
+    build: ./app/clean
+    container_name: clean
+    restart: always
+    ports:
+      - 8085:8084
+    depends_on:
+      - mysql
+      - rabbitmq
+      - scrap
+      - queue
+    networks:
+      - rabbitmq_go_net
+      - mysql_go_net
+  ### Grafana Container
+  grafana:
+      image: grafana/grafana:main
+      links:
+        - mysql:mysql
+      ports:
+        - 3000:3000
+      restart: unless-stopped
+      volumes:
+        - ./volumes/grafana-volume:/var/lib/grafana
+      depends_on:
+        - mysql
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - ./volumes/rabbitmq-volume:/var/lib/rabbitmq
+    command: ["bash", "-c", "chmod 400 /var/lib/rabbitmq/.erlang.cookie; rabbitmq-server"]
+    networks:
+      - rabbitmq_go_net
+volumes:
+  mysql-volume:
+  grafana-volume:
+  rabbitmq-volume:
+
+networks:
+  rabbitmq_go_net:
+    driver: bridge
+  mysql_go_net:
+    driver: bridge

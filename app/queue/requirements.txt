@@ -1,0 +1,7 @@
+python-dotenv
+mysql-connector-python
+requests
+datetime
+lxml
+timedelta
+pika
