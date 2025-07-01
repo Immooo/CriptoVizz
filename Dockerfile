@@ -1,5 +1,5 @@
-# cat Dockerfile
-FROM mysql:latest
+# Utiliser MySQL 8.0 au lieu de latest pour éviter les problèmes de mise à niveau
+FROM mysql:8.0
 
 MAINTAINER baeldung.com
 

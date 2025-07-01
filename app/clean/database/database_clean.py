@@ -1,39 +1,103 @@
 from .database_connection import Database_connection
 from datetime import datetime, timedelta
-
+import time
 
 class Database_clean:
-    def __init__(self):
-            self.db_connection = Database_connection()
+    def __init__(self, retention_hours=48):
+        self.db_connection = Database_connection()
+        self.retention_hours = retention_hours
+        
     def database_clean(self):
+        """Clean old data from the database"""
+        conn = None
+        cursor = None
+        
+        try:
+            # Establish connection
+            max_retries = 3
+            retry_count = 0
+            
+            while retry_count < max_retries:
+                try:
+                    conn = self.db_connection.connection()
+                    cursor = conn.cursor()
+                    break
+                except Exception as e:
+                    retry_count += 1
+                    print(f"❌ Tentative de connexion MySQL #{retry_count}: {e}")
+                    if retry_count < max_retries:
+                        time.sleep(5)
+                    else:
+                        raise Exception("Impossible de se connecter à MySQL")
+            
+            # Calculate cutoff date
+            date_limite = datetime.now() - timedelta(hours=self.retention_hours)
+            
+            # First, count records to be deleted
+            count_sql = "SELECT COUNT(*) FROM crypto WHERE cryptoDatetime < %s"
+            cursor.execute(count_sql, (date_limite,))
+            count_to_delete = cursor.fetchone()[0]
+            
+            if count_to_delete > 0:
+                # Delete old records
+                delete_sql = "DELETE FROM crypto WHERE cryptoDatetime < %s"
+                cursor.execute(delete_sql, (date_limite,))
+                
+                # Commit the transaction
+                conn.commit()
+                
+                print(f"✅ {count_to_delete} enregistrements obsolètes supprimés (plus de {self.retention_hours} heures)")
+                
+                # Optional: Optimize table after deletion
+                if count_to_delete > 1000:  # Only optimize if we deleted many records
+                    cursor.execute("OPTIMIZE TABLE crypto")
+                    print("✅ Table optimisée après suppression")
+            else:
+                print(f"ℹ️ Aucun enregistrement à supprimer (tous datent de moins de {self.retention_hours} heures)")
+            
+            # Print database statistics
+            cursor.execute("SELECT COUNT(*) as total, MIN(cryptoDatetime) as oldest, MAX(cryptoDatetime) as newest FROM crypto")
+            stats = cursor.fetchone()
+            if stats[0] > 0:
+                print(f"📊 Statistiques: {stats[0]} enregistrements, du {stats[1]} au {stats[2]}")
+            
+        except Exception as e:
+            print(f"❌ Erreur lors du nettoyage de la base de données: {e}")
+            if conn:
+                conn.rollback()
+                
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+                
+    def get_database_size(self):
+        """Get the size of the crypto table"""
+        conn = None
+        cursor = None
+        
         try:
             conn = self.db_connection.connection()
-
-            # Créer un objet de curseur
             cursor = conn.cursor()
-
-            # Calculer la date limite (48 heures avant la date actuelle)
-            date_limite = datetime.now() - timedelta(hours=48)
-
-            # Récupérer le numéro de minute actuel
-            minute_actuelle = datetime.now().minute
-
-            # Utiliser le modulo pour déterminer si le jeu de données doit être supprimé
-            if minute_actuelle % 2 == 0:
-                # Requête SQL pour supprimer les données obsolètes
-                sql = "DELETE FROM crypto WHERE cryptoDatetime < %s"
-                cursor.execute(sql, (date_limite,))
-
-                # Valider la transaction
-                conn.commit()
-
-                print("Données obsolètes supprimées avec succès.")
-            else:
-                print("Aucune suppression effectuée pour cette minute.")
-
+            
+            cursor.execute("""
+                SELECT 
+                    table_name,
+                    ROUND(((data_length + index_length) / 1024 / 1024), 2) AS size_mb,
+                    table_rows
+                FROM information_schema.tables
+                WHERE table_schema = 'crypto' AND table_name = 'crypto'
+            """)
+            
+            result = cursor.fetchone()
+            if result:
+                print(f"📈 Taille de la table: {result[1]} MB, {result[2]} lignes")
+                
         except Exception as e:
-            print(f"Erreur MySQL : {e}")
-
+            print(f"❌ Erreur lors de la récupération de la taille: {e}")
         finally:
-            cursor.close()
-            conn.close()
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
