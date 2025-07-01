@@ -97,7 +97,7 @@ We use **Gitflow** for the aspect that is a branching model for **Git** that hel
 $ git clone https://github.com/EpitechMscProPromo2024/T-DAT-901-LYO_11
 
 # Access
-$ cd T-DAT-901-LYO_11
+$ cd CriptoVizz
 
 
 # Launch Docker and command line : 
@@ -106,9 +106,6 @@ $ docker compose up
 #When process is done, you'll be able to access to the Grafana.
 
 ```
-
-
-## :family: Team ##
 
 **<h3>Scraping Module:</h3>**
 
@@ -160,13 +157,4 @@ $ docker compose up
 - Ensure that the README contains clear and concise instructions for setting up and running the project.
 - Provide information on the project's architecture, technologies used, and any additional setup requirements.
 
-## :memo: License ##
 
-This project is under license from MIT. For more details, see the [LICENSE](https://github.com/TaviotBaptiste/Crypto-Viz/blob/main/LICENSE) file.
-
-
-Made with :heart: by <a href="https://github.com/ArthurDufay" target="_blank">Arthur DUFAY</a> <a href="https://github.com/mamanin" target="_blank">Max MANIN</a> <a href="https://github.com/jojoricard" target="_blank">Joris RICARD</a>, <a href="https://github.com/ltournayre" target="_blank">LTournayre</a>, <a href="https://github.com/TaviotBaptiste" target="_blank">TaviotBaptiste</a>,
-
-&#xa0;
-
-<a href="#top">Back to top</a>

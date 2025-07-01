@@ -3,3 +3,4 @@ DS_Store
 
 volumes/mysql-volume/binlog.*
 volumes/mysql-volume/binlog.index
+volumes/

@@ -4,6 +4,8 @@ services:
   mysql:
     container_name: mysql
     build:
+      context: .
+      dockerfile: Dockerfile
       args:
         - MYSQL_DATABASE=${MYSQL_DATABASE}
         - MYSQL_USER=${MYSQL_USER}
@@ -13,8 +15,21 @@ services:
       - 3306:3306
     volumes:
       - ./volumes/mysql-volume:/var/lib/mysql
+      - ./script/createTableCrypto.sql:/docker-entrypoint-initdb.d/createTableCrypto.sql
     networks:
       - mysql_go_net
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 40s
+
   ### Python Container (Scrap)
   scrap:
     build: ./app/scrap
@@ -25,8 +40,11 @@ services:
     networks:
       - rabbitmq_go_net
     depends_on:
-      - mysql
-      - rabbitmq
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   ### Python Container (Queue)
   queue:
     build: ./app/queue
@@ -35,12 +53,16 @@ services:
     ports:
       - 8083:8082
     depends_on:
-      - mysql
-      - rabbitmq
-      - scrap
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      scrap:
+        condition: service_started
     networks:
       - rabbitmq_go_net
       - mysql_go_net
+
   ### Python Container (Clean)
   clean:
     build: ./app/clean
@@ -49,25 +71,35 @@ services:
     ports:
       - 8085:8084
     depends_on:
-      - mysql
-      - rabbitmq
-      - scrap
-      - queue
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      scrap:
+        condition: service_started
+      queue:
+        condition: service_started
     networks:
       - rabbitmq_go_net
       - mysql_go_net
+
   ### Grafana Container
   grafana:
       image: grafana/grafana:main
-      links:
-        - mysql:mysql
+      container_name: grafana
       ports:
         - 3000:3000
       restart: unless-stopped
       volumes:
         - ./volumes/grafana-volume:/var/lib/grafana
       depends_on:
-        - mysql
+        mysql:
+          condition: service_healthy
+      networks:
+        - mysql_go_net  # AJOUT DU RÉSEAU MYSQL
+      environment:
+        - GF_SECURITY_ADMIN_PASSWORD=admin
+
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: rabbitmq
@@ -79,6 +111,13 @@ services:
     command: ["bash", "-c", "chmod 400 /var/lib/rabbitmq/.erlang.cookie; rabbitmq-server"]
     networks:
       - rabbitmq_go_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
 volumes:
   mysql-volume:
   grafana-volume:
