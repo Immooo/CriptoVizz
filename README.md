@@ -93,8 +93,6 @@ We use **Gitflow** for the aspect that is a branching model for **Git** that hel
 ## :checkered_flag: Starting ##
 
 ```bash
-# Clone this project
-$ git clone https://github.com/EpitechMscProPromo2024/T-DAT-901-LYO_11
 
 # Access
 $ cd CriptoVizz
