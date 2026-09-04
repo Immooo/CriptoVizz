@@ -42,11 +42,31 @@
       "targets": [{"format": "table", "rawQuery": true, "rawSql": "SELECT published_at AS Published, source AS Source, title AS Title, sentiment_label AS Sentiment, JSON_UNQUOTE(topics) AS Topics, url AS URL FROM news_articles WHERE $__timeFilter(published_at) ORDER BY published_at DESC LIMIT 100", "refId": "A"}],
       "title": "Latest analyzed news",
       "type": "table"
+    },
+    {
+      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 70}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18},
+      "id": 5,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), source AS metric, SUM(article_count) AS value FROM pipeline_hourly WHERE $__timeFilter(bucket_start) GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "title": "Ingestion throughput by source",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 15, "lineWidth": 2}, "unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 18},
+      "id": 6,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), source AS metric, SUM(latency_sum_ms) / NULLIF(SUM(article_count), 0) AS value FROM pipeline_hourly WHERE $__timeFilter(bucket_start) GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "title": "Average pipeline latency by source",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 41,
-  "tags": ["crypto", "news", "analytics"],
+  "tags": ["crypto", "news", "analytics", "big-data"],
   "templating": {"list": [{"allValue": "All", "current": {"text": "All", "value": "All"}, "datasource": {"type": "mysql", "uid": "mysql-crypto-news"}, "definition": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic", "includeAll": true, "label": "Topic", "name": "topic", "query": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic", "refresh": 1, "type": "query"}]},
   "time": {"from": "now-24h", "to": "now"},
   "timepicker": {},

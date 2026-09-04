@@ -34,6 +34,15 @@ CREATE TABLE IF NOT EXISTS analytics_hourly (
     PRIMARY KEY (bucket_start, source, topic),
     INDEX idx_analytics_bucket (bucket_start)
 );
+CREATE TABLE IF NOT EXISTS pipeline_hourly (
+    bucket_start DATETIME NOT NULL,
+    source VARCHAR(120) NOT NULL,
+    article_count INT NOT NULL DEFAULT 0,
+    latency_sum_ms BIGINT NOT NULL DEFAULT 0,
+    latency_max_ms BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (bucket_start, source),
+    INDEX idx_pipeline_bucket (bucket_start)
+);
 """
 
 
@@ -50,6 +59,7 @@ class StorageConsumer:
         self.rabbitmq_url = os.getenv(
             "RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672"
         )
+        self.prefetch_count = int(os.getenv("STORAGE_PREFETCH_COUNT", "50"))
 
     @staticmethod
     def connect_db():
@@ -79,6 +89,8 @@ class StorageConsumer:
         published_at = utc_naive(article["published_at"])
         collected_at = utc_naive(article["collected_at"])
         bucket = published_at.replace(minute=0, second=0, microsecond=0)
+        processing_time = datetime.now(timezone.utc).replace(tzinfo=None)
+        latency_ms = max(0, int((processing_time - collected_at).total_seconds() * 1000))
         topics = article.get("topics") or ["other"]
 
         with self.connect_db() as database:
@@ -99,6 +111,19 @@ class StorageConsumer:
                 )
                 if cursor.rowcount == 0:
                     return False
+
+                cursor.execute(
+                    """
+                    INSERT INTO pipeline_hourly
+                    (bucket_start, source, article_count, latency_sum_ms, latency_max_ms)
+                    VALUES (%s, %s, 1, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        article_count = article_count + 1,
+                        latency_sum_ms = latency_sum_ms + VALUES(latency_sum_ms),
+                        latency_max_ms = GREATEST(latency_max_ms, VALUES(latency_max_ms))
+                    """,
+                    (bucket, article["source"], latency_ms, latency_ms),
+                )
 
                 for topic in topics:
                     label = article["sentiment_label"]
@@ -133,7 +158,7 @@ class StorageConsumer:
                 )
                 channel = connection.channel()
                 channel.queue_declare(queue=self.queue, durable=True)
-                channel.basic_qos(prefetch_count=20)
+                channel.basic_qos(prefetch_count=self.prefetch_count)
 
                 def callback(ch, method, properties, body):
                     try:

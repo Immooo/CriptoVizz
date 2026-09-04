@@ -30,7 +30,7 @@ services:
     environment:
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
       RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news}
-      NEWS_FEED_URLS: ${NEWS_FEED_URLS:-https://www.coindesk.com/arc/outboundfeeds/rss/}
+      NEWS_FEED_URLS: ${NEWS_FEED_URLS:-https://www.coindesk.com/arc/outboundfeeds/rss/,https://cointelegraph.com/rss}
       SCRAPE_INTERVAL_SECONDS: ${SCRAPE_INTERVAL_SECONDS:-60}
     networks:
       - rabbitmq_go_net
@@ -47,6 +47,7 @@ services:
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
       RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news}
       ANALYTICS_QUEUE: ${ANALYTICS_QUEUE:-enriched_news}
+      ANALYTICS_PREFETCH_COUNT: ${ANALYTICS_PREFETCH_COUNT:-50}
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -68,6 +69,7 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      STORAGE_PREFETCH_COUNT: ${STORAGE_PREFETCH_COUNT:-50}
     depends_on:
       mysql:
         condition: service_healthy

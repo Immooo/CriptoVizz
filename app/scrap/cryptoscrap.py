@@ -5,7 +5,10 @@ from datetime import datetime, timezone
 import feedparser
 
 
-DEFAULT_FEEDS = "https://www.coindesk.com/arc/outboundfeeds/rss/"
+DEFAULT_FEEDS = (
+    "https://www.coindesk.com/arc/outboundfeeds/rss/,"
+    "https://cointelegraph.com/rss"
+)
 
 
 class CryptoNewsScraper:
