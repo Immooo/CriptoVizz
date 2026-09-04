@@ -1,0 +1,57 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), topic AS metric, SUM(article_count) AS value FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND ('$topic' = 'All' OR topic = '$topic') GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "title": "News volume by topic",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 15, "lineWidth": 2}, "max": 1, "min": -1}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), topic AS metric, SUM(sentiment_sum) / NULLIF(SUM(article_count), 0) AS value FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND ('$topic' = 'All' OR topic = '$topic') GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "title": "Average sentiment over time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 75, "stacking": {"group": "A", "mode": "normal"}}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9},
+      "id": 3,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), SUM(positive_count) AS positive, SUM(neutral_count) AS neutral, SUM(negative_count) AS negative FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND ('$topic' = 'All' OR topic = '$topic') GROUP BY 1 ORDER BY 1", "refId": "A"}],
+      "title": "Sentiment distribution",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 9},
+      "id": 4,
+      "options": {"showHeader": true, "cellHeight": "sm"},
+      "targets": [{"format": "table", "rawQuery": true, "rawSql": "SELECT published_at AS Published, source AS Source, title AS Title, sentiment_label AS Sentiment, JSON_UNQUOTE(topics) AS Topics, url AS URL FROM news_articles WHERE $__timeFilter(published_at) ORDER BY published_at DESC LIMIT 100", "refId": "A"}],
+      "title": "Latest analyzed news",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["crypto", "news", "analytics"],
+  "templating": {"list": [{"allValue": "All", "current": {"text": "All", "value": "All"}, "datasource": {"type": "mysql", "uid": "mysql-crypto-news"}, "definition": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic", "includeAll": true, "label": "Topic", "name": "topic", "query": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic", "refresh": 1, "type": "query"}]},
+  "time": {"from": "now-24h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Crypto News Analytics",
+  "uid": "crypto-news-analytics",
+  "version": 1
+}

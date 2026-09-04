@@ -1,17 +1,16 @@
 import mysql.connector
-from dotenv import load_dotenv
+import os
+
+
 class Database_connection:
     def __init__(self):
         pass
 
     def connection(self):
-        load_dotenv()
-        mydb = mysql.connector.connect(
-            host="mysql",#Docker
-            #host="localhost",#Localhost
-            user="epitech",
-            password="epitech",
-            database="crypto",
-            port=3306
+        return mysql.connector.connect(
+            host=os.getenv("MYSQL_HOST", "mysql"),
+            user=os.getenv("MYSQL_USER", "crypto"),
+            password=os.getenv("MYSQL_PASSWORD", "crypto"),
+            database=os.getenv("MYSQL_DATABASE", "crypto"),
+            port=int(os.getenv("MYSQL_PORT", "3306")),
         )
-        return mydb

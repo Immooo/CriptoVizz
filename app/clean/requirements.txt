@@ -1,5 +1,1 @@
-python-dotenv
-mysql-connector-python
-requests
-datetime
-timedelta
+mysql-connector-python==9.0.0

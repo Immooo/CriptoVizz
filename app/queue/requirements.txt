@@ -1,7 +1,2 @@
-python-dotenv
-mysql-connector-python
-requests
-datetime
-lxml
-timedelta
-pika
+mysql-connector-python==9.0.0
+pika==1.3.2
