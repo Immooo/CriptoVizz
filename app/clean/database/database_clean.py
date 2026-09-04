@@ -1,9 +1,9 @@
 from .database_connection import Database_connection
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 
 class Database_clean:
-    def __init__(self, retention_hours=48):
+    def __init__(self, retention_hours=720):
         self.db_connection = Database_connection()
         self.retention_hours = retention_hours
         
@@ -31,16 +31,16 @@ class Database_clean:
                         raise Exception("Impossible de se connecter à MySQL")
             
             # Calculate cutoff date
-            date_limite = datetime.now() - timedelta(hours=self.retention_hours)
+            date_limite = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=self.retention_hours)
             
-            # First, count records to be deleted
-            count_sql = "SELECT COUNT(*) FROM crypto WHERE cryptoDatetime < %s"
+            # Count and delete old source articles. Hourly analytics are retained.
+            count_sql = "SELECT COUNT(*) FROM news_articles WHERE published_at < %s"
             cursor.execute(count_sql, (date_limite,))
             count_to_delete = cursor.fetchone()[0]
             
             if count_to_delete > 0:
                 # Delete old records
-                delete_sql = "DELETE FROM crypto WHERE cryptoDatetime < %s"
+                delete_sql = "DELETE FROM news_articles WHERE published_at < %s"
                 cursor.execute(delete_sql, (date_limite,))
                 
                 # Commit the transaction
@@ -50,13 +50,13 @@ class Database_clean:
                 
                 # Optional: Optimize table after deletion
                 if count_to_delete > 1000:  # Only optimize if we deleted many records
-                    cursor.execute("OPTIMIZE TABLE crypto")
+                    cursor.execute("OPTIMIZE TABLE news_articles")
                     print("✅ Table optimisée après suppression")
             else:
                 print(f"ℹ️ Aucun enregistrement à supprimer (tous datent de moins de {self.retention_hours} heures)")
             
             # Print database statistics
-            cursor.execute("SELECT COUNT(*) as total, MIN(cryptoDatetime) as oldest, MAX(cryptoDatetime) as newest FROM crypto")
+            cursor.execute("SELECT COUNT(*), MIN(published_at), MAX(published_at) FROM news_articles")
             stats = cursor.fetchone()
             if stats[0] > 0:
                 print(f"📊 Statistiques: {stats[0]} enregistrements, du {stats[1]} au {stats[2]}")
@@ -87,7 +87,7 @@ class Database_clean:
                     ROUND(((data_length + index_length) / 1024 / 1024), 2) AS size_mb,
                     table_rows
                 FROM information_schema.tables
-                WHERE table_schema = 'crypto' AND table_name = 'crypto'
+                WHERE table_schema = DATABASE() AND table_name = 'news_articles'
             """)
             
             result = cursor.fetchone()

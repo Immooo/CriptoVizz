@@ -1,10 +1,8 @@
-FROM python:3.8-slim-buster
+FROM python:3.12-slim
 
-WORKDIR /app/queue
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
 
-RUN pip install --upgrade pip
-COPY requirements.txt /queue/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /queue/requirements.txt
-COPY . /app/queue
-#RUN
-CMD [ "python", "./main.py"]
+CMD ["python", "main.py"]

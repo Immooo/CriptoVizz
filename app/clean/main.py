@@ -1,11 +1,12 @@
 import time
+import os
 from datetime import datetime
 from database.database_clean import Database_clean
 
 if __name__ == "__main__":
     # Configuration
     CLEANUP_INTERVAL_MINUTES = 60  # Run cleanup every hour
-    RETENTION_HOURS = 48  # Keep data for 48 hours
+    RETENTION_HOURS = int(os.getenv("RETENTION_DAYS", "30")) * 24
     
     db_clean = Database_clean(retention_hours=RETENTION_HOURS)
     

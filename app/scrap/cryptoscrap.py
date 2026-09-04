@@ -1,62 +1,64 @@
-from bs4 import BeautifulSoup
-import requests
-from datetime import datetime
+import hashlib
+import os
+from datetime import datetime, timezone
 
-class Cryptoscrap:
-    def __init__(self):
-        pass
+import feedparser
 
-    def cryptoscrapfct(self):
-        # datetime object containing current date and time
-        now = datetime.now()
-        
-        try:
-            # Website crypto
-            res = requests.get('https://crypto.com/price', timeout=10)
-            res.raise_for_status()  # Raise exception for bad status codes
-        except requests.RequestException as e:
-            print(f"❌ Error fetching crypto prices: {e}")
-            return []
 
-        soup = BeautifulSoup(res.text, 'lxml')
-        cryptos = soup.find_all('tr', class_='css-1cxc880')
-        table = []
-        
-        for crypto in cryptos:
-            try:
-                crypto_name = crypto.find('p', class_='chakra-text css-rkws3').text
-                crypto_price = crypto.find('p', class_='chakra-text css-5a8n3t').text[1:]
-                crypto_price = crypto_price.replace(",", "")
-                crypto_datetime = now.strftime("%Y-%m-%d %H:%M:%S")
-                crypto_classement = crypto.find('td', class_='css-w6jew4').text
-                crypto_volume = crypto.find('td', class_='css-15lyn3l').text[1:]
-                
-                # Handle special cases for volume
-                if crypto_volume == "_A" or crypto_volume == "":
-                    crypto_volume = "0"
-                    
-                crypto_change_elem = crypto.find('td', class_='css-vtw5vj')
-                crypto_change = "0"  # Default value
-                
-                if crypto_change_elem and crypto_change_elem.text:
-                    crypto_change = crypto_change_elem.text.rstrip('%')
-                    if crypto_change.startswith("+"):
-                        crypto_change = crypto_change[1:]
-                
-                # Validate data before adding
-                if crypto_name and crypto_price and crypto_classement:
-                    data_dict = {
-                        'cryptoName': crypto_name[:50],  # Truncate to 50 chars max
-                        'cryptoPrice': crypto_price,
-                        'cryptoDatetime': crypto_datetime,
-                        'cryptoClassement': crypto_classement,
-                        'cryptoVolume': crypto_volume,  # Fixed: capital V
-                        'cryptoChange': crypto_change    # Fixed: capital C
-                    }
-                    table.append(data_dict)
-                    
-            except AttributeError as e:
-                print(f"⚠️ Error parsing crypto data: {e}")
+DEFAULT_FEEDS = "https://www.coindesk.com/arc/outboundfeeds/rss/"
+
+
+class CryptoNewsScraper:
+    """Collect and normalize articles from cryptocurrency RSS feeds."""
+
+    def __init__(self, feed_urls=None):
+        configured = feed_urls or os.getenv("NEWS_FEED_URLS", DEFAULT_FEEDS).split(",")
+        self.feed_urls = [url.strip() for url in configured if url.strip()]
+
+    @staticmethod
+    def _iso_datetime(entry, field, fallback):
+        parsed = entry.get(field)
+        if parsed:
+            return datetime(*parsed[:6], tzinfo=timezone.utc).isoformat()
+        return fallback
+
+    @staticmethod
+    def _article_id(url):
+        return hashlib.sha256(url.encode("utf-8")).hexdigest()
+
+    def collect(self):
+        collected_at = datetime.now(timezone.utc).isoformat()
+        articles = []
+
+        for feed_url in self.feed_urls:
+            feed = feedparser.parse(feed_url)
+            if feed.bozo and not feed.entries:
+                print(f"Unable to read RSS feed {feed_url}: {feed.bozo_exception}")
                 continue
-                
-        return table
+
+            source = feed.feed.get("title", feed_url)
+            for entry in feed.entries:
+                url = entry.get("link") or entry.get("id")
+                title = (entry.get("title") or "").strip()
+                if not url or not title:
+                    continue
+
+                articles.append(
+                    {
+                        "article_id": self._article_id(url),
+                        "source": source[:120],
+                        "title": title[:500],
+                        "summary": (entry.get("summary") or "")[:5000],
+                        "url": url[:1000],
+                        "published_at": self._iso_datetime(
+                            entry, "published_parsed", collected_at
+                        ),
+                        "collected_at": collected_at,
+                    }
+                )
+
+        return articles
+
+
+# Backward-compatible alias for existing imports.
+Cryptoscrap = CryptoNewsScraper

@@ -1,20 +1,12 @@
-version: '3.3'
 services:
   ### MySQL Container
   mysql:
     container_name: mysql
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - MYSQL_DATABASE=${MYSQL_DATABASE}
-        - MYSQL_USER=${MYSQL_USER}
-        - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-        - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    image: mysql:8.4
     ports:
       - 3306:3306
     volumes:
-      - ./volumes/mysql-volume:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
       - ./script/createTableCrypto.sql:/docker-entrypoint-initdb.d/createTableCrypto.sql
     networks:
       - mysql_go_net
@@ -35,29 +27,53 @@ services:
     build: ./app/scrap
     container_name: scrap
     restart: always
-    ports:
-      - 8081:8000
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
+      RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news}
+      NEWS_FEED_URLS: ${NEWS_FEED_URLS:-https://www.coindesk.com/arc/outboundfeeds/rss/}
+      SCRAPE_INTERVAL_SECONDS: ${SCRAPE_INTERVAL_SECONDS:-60}
     networks:
       - rabbitmq_go_net
     depends_on:
-      mysql:
-        condition: service_healthy
       rabbitmq:
         condition: service_healthy
 
-  ### Python Container (Queue)
+  ### Online Analytics Builder (consumer and producer)
+  analytics:
+    build: ./app/analytics
+    container_name: analytics
+    restart: always
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
+      RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news}
+      ANALYTICS_QUEUE: ${ANALYTICS_QUEUE:-enriched_news}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      scrap:
+        condition: service_started
+    networks:
+      - rabbitmq_go_net
+
+  ### Analytics storage consumer
   queue:
     build: ./app/queue
     container_name: queue
     restart: always
-    ports:
-      - 8083:8082
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
+      ANALYTICS_QUEUE: ${ANALYTICS_QUEUE:-enriched_news}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
       rabbitmq:
         condition: service_started
-      scrap:
+      analytics:
         condition: service_started
     networks:
       - rabbitmq_go_net
@@ -68,47 +84,49 @@ services:
     build: ./app/clean
     container_name: clean
     restart: always
-    ports:
-      - 8085:8084
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
     depends_on:
       mysql:
         condition: service_healthy
-      rabbitmq:
-        condition: service_started
-      scrap:
-        condition: service_started
-      queue:
-        condition: service_started
     networks:
-      - rabbitmq_go_net
       - mysql_go_net
 
   ### Grafana Container
   grafana:
-      image: grafana/grafana:main
+      image: grafana/grafana:12.1.0
       container_name: grafana
       ports:
         - 3000:3000
       restart: unless-stopped
       volumes:
-        - ./volumes/grafana-volume:/var/lib/grafana
+        - grafana-data:/var/lib/grafana
+        - ./grafana/provisioning:/etc/grafana/provisioning:ro
+        - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       depends_on:
         mysql:
           condition: service_healthy
       networks:
         - mysql_go_net  # AJOUT DU RÉSEAU MYSQL
       environment:
-        - GF_SECURITY_ADMIN_PASSWORD=admin
+        - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+        - MYSQL_DATABASE=${MYSQL_DATABASE}
+        - MYSQL_USER=${MYSQL_USER}
+        - MYSQL_PASSWORD=${MYSQL_PASSWORD}
 
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: rabbitmq:4.1-management-alpine
     container_name: rabbitmq
     ports:
       - 5672:5672
       - 15672:15672
     volumes:
-      - ./volumes/rabbitmq-volume:/var/lib/rabbitmq
-    command: ["bash", "-c", "chmod 400 /var/lib/rabbitmq/.erlang.cookie; rabbitmq-server"]
+      - rabbitmq-data:/var/lib/rabbitmq
     networks:
       - rabbitmq_go_net
     healthcheck:
@@ -119,9 +137,9 @@ services:
       start_period: 30s
 
 volumes:
-  mysql-volume:
-  grafana-volume:
-  rabbitmq-volume:
+  mysql-data:
+  grafana-data:
+  rabbitmq-data:
 
 networks:
   rabbitmq_go_net:

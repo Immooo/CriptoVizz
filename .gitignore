@@ -1,6 +1,10 @@
 /.idea
-DS_Store
-
-volumes/mysql-volume/binlog.*
-volumes/mysql-volume/binlog.index
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.env
+.venv/
+venv/
+.DS_Store
 volumes/
