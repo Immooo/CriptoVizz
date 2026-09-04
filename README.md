@@ -25,6 +25,7 @@ provisioned from versioned files under `grafana/`.
 ## :sparkles: Features ##
 
 :heavy_check_mark: continuously collect data from a cryptocurrency news feed ;\
+:heavy_check_mark: ingest multiple configurable sources with back-pressure ;\
 :heavy_check_mark: publish normalized articles to a durable RabbitMQ queue ;\
 :heavy_check_mark: continuously compute sentiment, topics, and hourly aggregates ;\
 :heavy_check_mark: automatically clear old raw articles while retaining aggregates ;\
@@ -97,6 +98,8 @@ must never be committed.
 - Average sentiment over time
 - Sentiment distribution
 - Latest analyzed articles
+- Ingestion throughput by source
+- Average pipeline latency by source
 
 
 ## :checkered_flag: Starting ##

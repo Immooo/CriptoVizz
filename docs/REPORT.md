@@ -20,7 +20,7 @@ flowchart LR
     DB --> G[Dynamic Grafana Viewer]
 ```
 
-The scraper is the producer of normalized news events. The analytics builder is
+The scraper collects several independent feeds and is the producer of normalized news events. The analytics builder is
 both a consumer of `raw_news` and a producer of `enriched_news`, satisfying the
 producer/consumer requirement. The storage worker consumes enriched events and
 updates both the source table and hourly aggregates. Grafana reads these
@@ -37,6 +37,7 @@ The online analytics builder produces:
 - a lexical sentiment score between -1 and 1 and a positive/neutral/negative label;
 - topic detection for Bitcoin, Ethereum, regulation, DeFi, security, and markets;
 - hourly article counts and sentiment distributions, materialized in MySQL.
+- pipeline throughput and processing-latency measurements grouped by hour and source.
 
 The lexical method is deterministic, fast, explainable, and has no external model
 dependency. Its limitation is that it does not understand sarcasm or complex
@@ -51,6 +52,21 @@ context; replacing it with a trained model is a possible future improvement.
   viewer includes automatic refresh and temporal filtering.
 - **Docker Compose:** provides one-command local deployment and isolated networks.
 - **Python:** keeps the three online workers small and independently deployable.
+
+## Big-data orientation and scalability
+
+The project applies useful big-data patterns without adding unnecessary cluster
+infrastructure. Events are streamed instead of processed as a monolithic batch,
+queues absorb traffic spikes, and configurable prefetch limits apply back-pressure.
+Deterministic identifiers make delivery idempotent, while compact hourly tables
+avoid repeatedly scanning all raw articles for dashboard queries. The dashboard
+also exposes ingestion throughput and end-to-end processing latency per source.
+
+Collection sources and worker prefetch values are environment-driven. For a larger
+workload, several analytics or storage worker replicas can consume the same queue;
+RabbitMQ distributes messages between them and MySQL uniqueness prevents duplicate
+articles. Kafka, Spark, and a data lake are deliberately deferred until volume or
+retention requirements justify their operational cost.
 
 ## Reliability and operations
 

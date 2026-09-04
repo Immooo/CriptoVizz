@@ -10,6 +10,7 @@ from analytics import analyze_article
 RAW_QUEUE = os.getenv("RAW_NEWS_QUEUE", "raw_news")
 ANALYTICS_QUEUE = os.getenv("ANALYTICS_QUEUE", "enriched_news")
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672")
+PREFETCH_COUNT = int(os.getenv("ANALYTICS_PREFETCH_COUNT", "50"))
 
 
 def run():
@@ -20,7 +21,7 @@ def run():
             channel.queue_declare(queue=RAW_QUEUE, durable=True)
             channel.queue_declare(queue=ANALYTICS_QUEUE, durable=True)
             channel.confirm_delivery()
-            channel.basic_qos(prefetch_count=20)
+            channel.basic_qos(prefetch_count=PREFETCH_COUNT)
 
             def callback(ch, method, properties, body):
                 try:

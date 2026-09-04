@@ -25,3 +25,13 @@ CREATE TABLE IF NOT EXISTS analytics_hourly (
     PRIMARY KEY (bucket_start, source, topic),
     INDEX idx_analytics_bucket (bucket_start)
 );
+
+CREATE TABLE IF NOT EXISTS pipeline_hourly (
+    bucket_start DATETIME NOT NULL,
+    source VARCHAR(120) NOT NULL,
+    article_count INT NOT NULL DEFAULT 0,
+    latency_sum_ms BIGINT NOT NULL DEFAULT 0,
+    latency_max_ms BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (bucket_start, source),
+    INDEX idx_pipeline_bucket (bucket_start)
+);
