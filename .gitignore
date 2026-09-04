@@ -2,6 +2,10 @@
 **/__pycache__/
 *.py[cod]
 .pytest_cache/
+.codex-build/
+.codex-finalizer/
+output/presentation/*
+!output/presentation/crypto-viz-soutenance-ready.pptx
 .coverage
 .env
 .venv/
