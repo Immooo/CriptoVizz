@@ -6,6 +6,7 @@
 .codex-finalizer/
 output/presentation/*
 !output/presentation/crypto-viz-soutenance-ready.pptx
+!output/presentation/crypto-viz-soutenance-final-with-screenshots.pptx
 .coverage
 .env
 .venv/
