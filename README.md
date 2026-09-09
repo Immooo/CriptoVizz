@@ -1,173 +1,163 @@
-
 <h1 align="center">Crypto-Viz</h1>
 
 <p align="center">
-  <a href="#dart-about">About</a> &#xa0; | &#xa0; 
-  <a href="#sparkles-features">Features</a> &#xa0; | &#xa0;
-  <a href="#rocket-technologies">Technologies</a> &#xa0; | &#xa0;
-  <a href="#white_check_mark-requirements">Requirements</a> &#xa0; | &#xa0;
-  <a href="#office-Architecture">Architecture</a> &#xa0; | &#xa0;
-  <a href="#checkered_flag-starting">Starting</a> &#xa0; | &#xa0;
-  <a href="#family-Team">Team</a> &#xa0; | &#xa0;
-  <a href="#memo-license">License</a> &#xa0; | &#xa0;
+  <a href="#-présentation">Présentation</a> &#xa0; | &#xa0;
+  <a href="#-fonctionnalités">Fonctionnalités</a> &#xa0; | &#xa0;
+  <a href="#-technologies">Technologies</a> &#xa0; | &#xa0;
+  <a href="#-prérequis">Prérequis</a> &#xa0; | &#xa0;
+  <a href="#-architecture">Architecture</a> &#xa0; | &#xa0;
+  <a href="#-démarrage">Démarrage</a>
 </p>
 
-<br>
+## 🎯 Présentation
 
-## :dart: About ##
+Crypto Viz collecte en continu des actualités sur les cryptomonnaies, les enrichit
+avec des analyses en ligne et affiche des indicateurs temporels dans Grafana.
 
-Crypto Viz continuously collects cryptocurrency news, enriches it with online
-analytics, and displays time-based insights in Grafana.
+Les données d’exécution sont conservées dans des volumes Docker. Le dashboard et
+la configuration de la datasource sont provisionnés depuis les fichiers versionnés
+du dossier `grafana/`.
 
-Runtime data lives in Docker volumes. Dashboards and datasource configuration are
-provisioned from versioned files under `grafana/`.
+## ✨ Fonctionnalités
 
-## :sparkles: Features ##
+- Collecte continue de flux RSS d’actualités crypto.
+- Ingestion de plusieurs sources configurables avec back-pressure.
+- Publication d’articles normalisés dans des queues RabbitMQ durables.
+- Analyse continue du sentiment, des thèmes et des agrégats horaires.
+- Conservation des messages invalides dans des dead-letter queues (`.dlq`).
+- Suppression automatique des articles bruts anciens, avec conservation des agrégats.
+- Visualisation dynamique avec rafraîchissement automatique et filtres temporels.
 
-:heavy_check_mark: continuously collect data from a cryptocurrency news feed ;\
-:heavy_check_mark: ingest multiple configurable sources with back-pressure ;\
-:heavy_check_mark: publish normalized articles to a durable RabbitMQ queue ;\
-:heavy_check_mark: continuously compute sentiment, topics, and hourly aggregates ;\
-:heavy_check_mark: automatically clear old raw articles while retaining aggregates ;\
-:heavy_check_mark: dynamically visualize analytics with auto-refresh and time filters ;\
-
-
-## :rocket: Technologies ##
-
-The following tools were used in this project:
+## 🚀 Technologies
 
 - [Python](https://www.python.org/)
 - [Docker](https://www.docker.com/)
 - [Git](https://git-scm.com)
-- [Mysql](https://www.mysql.com/)
+- [MySQL](https://www.mysql.com/)
 - [RabbitMQ](https://www.rabbitmq.com/)
 - [Grafana](https://grafana.com/)
 
-<h3>Libraries : </h3>
+Bibliothèques principales :
 
-- **feedparser**: Parses the configured cryptocurrency RSS news feeds.
+- **feedparser** : lecture des flux RSS configurés ;
+- **mysql-connector-python** : connexion aux bases MySQL ;
+- **pika** : publication et consommation des messages RabbitMQ.
 
-- **mysql-connector-python**: A MySQL connector library for Python, enabling communication between Python applications and MySQL databases.
+## ✅ Prérequis
 
-- **pika**: A Python library for interacting with RabbitMQ, allowing for the creation, consumption, and management of messages in a RabbitMQ queue.
+Installer [Git](https://git-scm.com/) et [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
-## :white_check_mark: Requirements ##
+## 🏗️ Architecture
 
-Before starting, install [Git](https://git-scm.com) and [Docker](https://www.docker.com/).
-
-## :office: Architecture ##
-
-The scraper polls configurable crypto news RSS feeds and publishes to `raw_news`.
-The online analytics builder consumes that queue, computes sentiment and topics,
-then publishes to `enriched_news`. A storage consumer writes deduplicated articles
-and hourly aggregates to MySQL. Grafana queries those aggregates and refreshes
-automatically. See [the architecture report](docs/REPORT.md) for the rationale.
+Le scraper interroge les flux RSS et publie des événements normalisés dans
+`raw_news_v3`. Le service Analytics consomme cette queue, calcule le sentiment et
+les thèmes, puis publie les événements enrichis dans `enriched_news_v3`. Le worker
+Storage déduplique les articles, écrit les données et met à jour les agrégats
+horaires dans MySQL. Grafana interroge ces agrégats automatiquement.
 
 ```mermaid
 flowchart LR
-  RSS[Crypto news RSS] --> Scraper
-  Scraper -->|raw_news| RabbitMQ
+  RSS[Flux RSS crypto] --> Scraper
+  Scraper -->|raw_news_v3| RabbitMQ
   RabbitMQ --> Analytics
-  Analytics -->|enriched_news| RabbitMQ
+  Analytics -->|enriched_news_v3| RabbitMQ
   RabbitMQ --> Storage
   Storage --> MySQL
   MySQL --> Grafana
 ```
 
+Les queues invalides sont routées vers `raw_news_v3.dlq` et
+`enriched_news_v3.dlq`. Les messages valides utilisent une livraison au moins une
+fois, avec déduplication idempotente côté MySQL.
 
-<h3>Initial data</h3>
+### Données initiales
 
-The application starts empty and fills itself from the live RSS feeds. Deterministic
-article identifiers prevent duplicate rows across polling cycles.
+L’application démarre sans données et se remplit à partir des flux RSS actifs.
+L’identifiant déterministe de chaque article évite les doublons entre deux cycles
+de polling.
 
+### Base de données
 
-<h3>Database : </h3>
+MySQL contient notamment :
 
-MySQL stores deduplicated articles in `news_articles` and time-series indicators
-in `analytics_hourly`.
+- `news_articles` : articles dédupliqués et enrichis ;
+- `analytics_hourly` : volumes et sentiments par heure ;
+- `pipeline_hourly` : débit et latence du pipeline.
 
+### Graphiques Grafana
 
-<h3>Process GitFlow : </h3>  
+- volume d’articles par thème et dans le temps ;
+- sentiment moyen et distribution des sentiments ;
+- derniers articles analysés ;
+- débit d’ingestion par source ;
+- latence moyenne et maximale par source.
 
-Use short-lived feature branches and pull requests. Runtime databases and secrets
-must never be committed.
-
-
-<h3>Graphs : </h3>
-- News volume by topic over time
-- Average sentiment over time
-- Sentiment distribution
-- Latest analyzed articles
-- Ingestion throughput by source
-- Average pipeline latency by source
-
-
-## :checkered_flag: Starting ##
+## ▶️ Démarrage
 
 ```bash
+# Cloner le projet
+git clone https://github.com/Immooo/CriptoVizz.git
+cd CriptoVizz
 
-# Access
-$ cd CriptoVizz
+# Créer la configuration locale
+cp .env.example .env
 
-# Configure local credentials
-$ cp .env.example .env
-
-# Build and launch all services
-$ docker compose up --build
-
-# Grafana: http://localhost:3000
-# RabbitMQ management: http://localhost:15672
-
+# Construire et lancer tous les services
+docker compose up --build
 ```
 
-To demonstrate horizontal processing, start three competing Analytics consumers:
+Accès :
+
+- Grafana : <http://localhost:3000>
+- Interface RabbitMQ : <http://localhost:15672>
+
+Pour démontrer le scaling horizontal du traitement Analytics :
 
 ```bash
 docker compose up --build --scale analytics=3
 ```
 
-RabbitMQ distributes `raw_news` messages across the replicas. The prefetch limit
-prevents one replica from reserving the entire backlog.
+RabbitMQ répartit les messages de `raw_news_v3` entre les trois consommateurs.
+La limite de prefetch empêche une seule instance de réserver tout le backlog.
 
-**<h3>Scraping Module:</h3>**
+## 🧩 Services
 
-- Poll one or more RSS feeds configured with `NEWS_FEED_URLS`.
-- Normalize and deduplicate articles before publishing them.
-- Run continuously at the configured interval.
-  
-**<h3>Queue System:</h3>**
+### Scraper
 
-- Use `raw_news` and `enriched_news` as durable queues.
-- Acknowledge messages only after successful processing.
-- Route invalid messages to `raw_news.dlq` or `enriched_news.dlq` for inspection
-  instead of losing them.
+- Lit les URL définies dans `NEWS_FEED_URLS`.
+- Normalise et déduplique les articles avant publication.
+- Recommence selon `SCRAPE_INTERVAL_SECONDS`.
 
-**<h3>Data Processing and Analytics:</h3>**
+### Queues
 
-- Consume raw articles and publish enriched analytics events.
-- Calculate sentiment, topics, and hourly indicators continuously.
-- Persist both source articles and aggregates in MySQL.
+- `raw_news_v3` transporte les articles bruts.
+- `enriched_news_v3` transporte les événements enrichis.
+- Les `.dlq` conservent les messages invalides pour diagnostic et rejeu contrôlé.
+- Un message n’est acquitté qu’après traitement réussi.
 
-**<h3>Database Management:</h3>**
+### Traitement et analyse
 
-- Set up MySQL as the database for storing processed data.
-- Implement a mechanism to automatically clear old data from the database to lighten it over time.
-- Consider using datetime and timedelta for managing time-related operations.
+- Consomme les articles bruts et publie les événements enrichis.
+- Calcule sentiment, thèmes et indicateurs horaires en continu.
+- Persiste les articles et agrégats dans MySQL.
 
-**<h3>Visualization Module:</h3>**
+### Nettoyage
 
-- Set up Grafana for dynamically visualizing analytics.
-- Provision versioned time-series, distribution, and article-table panels.
-- Ensure Grafana can directly query the database for real-time updates.
+Le service `clean` supprime les articles bruts plus anciens que
+`RETENTION_DAYS`, tout en conservant les agrégats horaires.
 
-**<h3>Dockerization:</h3>**
+### Visualisation
 
-- Dockerize the entire project for easy deployment and scalability.
-- Provide clear instructions in the README for launching the project using Docker Compose.
+Grafana utilise une datasource MySQL et un dashboard provisionnés depuis Git.
 
-**<h3>Documentation:</h3>**
+### Dockerisation
 
-- Ensure that the README contains clear and concise instructions for setting up and running the project.
-- Provide information on the project's architecture, technologies used, and any additional setup requirements.
+Docker Compose isole les services, réseaux, variables d’environnement et volumes.
+Le service Analytics peut être répliqué avec `--scale` pour tester la distribution
+du travail.
 
+## 📚 Documentation complémentaire
+
+- [Rapport d’architecture et choix techniques](docs/REPORT.md)
+- [Préparation de la soutenance](docs/PREPARATION_SOUTENANCE.md)
 
