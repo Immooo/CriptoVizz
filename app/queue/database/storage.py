@@ -77,7 +77,7 @@ def utc_naive(value):
 
 class StorageConsumer:
     def __init__(self):
-        self.queue = os.getenv("ANALYTICS_QUEUE", "enriched_news_v3")
+        self.queue = os.getenv("ANALYTICS_QUEUE", "enriched_news")
         self.rabbitmq_url = os.getenv(
             "RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672"
         )
@@ -110,7 +110,8 @@ class StorageConsumer:
     def store(self, article):
         published_at = utc_naive(article["published_at"])
         collected_at = utc_naive(article["collected_at"])
-        bucket = published_at.replace(minute=0, second=0, microsecond=0)
+        analytics_bucket = published_at.replace(minute=0, second=0, microsecond=0)
+        pipeline_bucket = collected_at.replace(minute=0, second=0, microsecond=0)
         processing_time = datetime.now(timezone.utc).replace(tzinfo=None)
         latency_ms = max(0, int((processing_time - collected_at).total_seconds() * 1000))
         topics = article.get("topics") or ["other"]
@@ -144,7 +145,7 @@ class StorageConsumer:
                         latency_sum_ms = latency_sum_ms + VALUES(latency_sum_ms),
                         latency_max_ms = GREATEST(latency_max_ms, VALUES(latency_max_ms))
                     """,
-                    (bucket, article["source"], latency_ms, latency_ms),
+                    (pipeline_bucket, article["source"], latency_ms, latency_ms),
                 )
 
                 for topic in topics:
@@ -163,7 +164,7 @@ class StorageConsumer:
                             sentiment_sum = sentiment_sum + VALUES(sentiment_sum)
                         """,
                         (
-                            bucket, article["source"], topic,
+                            analytics_bucket, article["source"], topic,
                             int(label == "positive"), int(label == "neutral"),
                             int(label == "negative"), article["sentiment_score"],
                         ),

@@ -9,7 +9,7 @@
       "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
       "id": 1,
       "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h', 0), topic AS metric, SUM(article_count) AS value FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND ('$topic' = 'All' OR topic = '$topic') GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h', 0), topic AS metric, SUM(article_count) AS value FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND topic IN (${topic:sqlstring}) GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
       "title": "News volume by topic",
       "type": "timeseries"
     },
@@ -19,7 +19,7 @@
       "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
       "id": 2,
       "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), topic AS metric, SUM(sentiment_sum) / NULLIF(SUM(article_count), 0) AS value FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND ('$topic' = 'All' OR topic = '$topic') GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), topic AS metric, SUM(sentiment_sum) / NULLIF(SUM(article_count), 0) AS value FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND topic IN (${topic:sqlstring}) GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
       "title": "Average sentiment over time",
       "type": "timeseries"
     },
@@ -29,7 +29,7 @@
       "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9},
       "id": 3,
       "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), SUM(positive_count) AS positive, SUM(neutral_count) AS neutral, SUM(negative_count) AS negative FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND ('$topic' = 'All' OR topic = '$topic') GROUP BY 1 ORDER BY 1", "refId": "A"}],
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(published_at, '1h'), SUM(sentiment_label = 'positive') AS positive, SUM(sentiment_label = 'neutral') AS neutral, SUM(sentiment_label = 'negative') AS negative FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring})) GROUP BY 1 ORDER BY 1", "refId": "A"}],
       "title": "Sentiment distribution",
       "type": "timeseries"
     },
@@ -49,7 +49,7 @@
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18},
       "id": 5,
       "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), source AS metric, SUM(article_count) AS value FROM pipeline_hourly WHERE $__timeFilter(bucket_start) GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(collected_at, '1h'), source AS metric, COUNT(*) AS value FROM news_articles WHERE $__timeFilter(collected_at) GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
       "title": "Ingestion throughput by source",
       "type": "timeseries"
     },
@@ -67,7 +67,7 @@
   "refresh": "30s",
   "schemaVersion": 41,
   "tags": ["crypto", "news", "analytics", "big-data"],
-  "templating": {"list": [{"allValue": "All", "current": {"text": "All", "value": "All"}, "datasource": {"type": "mysql", "uid": "mysql-crypto-news"}, "definition": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic", "includeAll": true, "label": "Topic", "name": "topic", "query": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic", "refresh": 1, "type": "query"}]},
+  "templating": {"list": [{"current": {"text": "All", "value": "$__all"}, "datasource": {"type": "mysql", "uid": "mysql-crypto-news"}, "definition": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic", "includeAll": true, "label": "Topic", "multi": true, "name": "topic", "query": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic", "refresh": 1, "type": "query"}]},
   "time": {"from": "now-24h", "to": "now"},
   "timepicker": {},
   "timezone": "browser",

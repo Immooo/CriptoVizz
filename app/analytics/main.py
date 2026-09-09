@@ -7,8 +7,8 @@ import pika
 from analytics import analyze_article
 
 
-RAW_QUEUE = os.getenv("RAW_NEWS_QUEUE", "raw_news_v3")
-ANALYTICS_QUEUE = os.getenv("ANALYTICS_QUEUE", "enriched_news_v3")
+RAW_QUEUE = os.getenv("RAW_NEWS_QUEUE", "raw_news")
+ANALYTICS_QUEUE = os.getenv("ANALYTICS_QUEUE", "enriched_news")
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672")
 PREFETCH_COUNT = int(os.getenv("ANALYTICS_PREFETCH_COUNT", "50"))
 DEAD_LETTER_EXCHANGE = os.getenv("DEAD_LETTER_EXCHANGE", "dead_letter")
