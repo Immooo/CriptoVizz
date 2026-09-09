@@ -160,4 +160,4 @@ du travail.
 
 - [Rapport d’architecture et choix techniques](docs/REPORT.md)
 - [Préparation de la soutenance](docs/PREPARATION_SOUTENANCE.md)
-
+- [Plan d’entraînement personnalisé et suivi des acquis](docs/PLAN_ENTRAINEMENT_PERSONNALISE.md)
