@@ -7,7 +7,8 @@ import pika
 from cryptoscrap import CryptoNewsScraper
 
 
-RAW_QUEUE = os.getenv("RAW_NEWS_QUEUE", "raw_news")
+RAW_QUEUE = os.getenv("RAW_NEWS_QUEUE", "raw_news_v3")
+DEAD_LETTER_EXCHANGE = os.getenv("DEAD_LETTER_EXCHANGE", "dead_letter")
 POLL_INTERVAL_SECONDS = int(os.getenv("SCRAPE_INTERVAL_SECONDS", "60"))
 
 
@@ -19,7 +20,15 @@ def connect():
         try:
             connection = pika.BlockingConnection(params)
             channel = connection.channel()
-            channel.queue_declare(queue=RAW_QUEUE, durable=True)
+            dead_letter_queue = f"{RAW_QUEUE}.dlq"
+            channel.exchange_declare(exchange=DEAD_LETTER_EXCHANGE, exchange_type="direct", durable=True)
+            channel.queue_declare(queue=dead_letter_queue, durable=True)
+            channel.queue_bind(exchange=DEAD_LETTER_EXCHANGE, queue=dead_letter_queue, routing_key=RAW_QUEUE)
+            channel.queue_declare(
+                queue=RAW_QUEUE,
+                durable=True,
+                arguments={"x-dead-letter-exchange": DEAD_LETTER_EXCHANGE},
+            )
             channel.confirm_delivery()
             return connection, channel
         except pika.exceptions.AMQPConnectionError as exc:

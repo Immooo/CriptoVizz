@@ -77,7 +77,7 @@ def utc_naive(value):
 
 class StorageConsumer:
     def __init__(self):
-        self.queue = os.getenv("ANALYTICS_QUEUE", "enriched_news")
+        self.queue = os.getenv("ANALYTICS_QUEUE", "enriched_news_v3")
         self.rabbitmq_url = os.getenv(
             "RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672"
         )
