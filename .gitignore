@@ -7,6 +7,7 @@
 output/presentation/*
 !output/presentation/crypto-viz-soutenance-ready.pptx
 !output/presentation/crypto-viz-soutenance-final-with-screenshots.pptx
+!output/presentation/crypto-viz-soutenance-30-minutes.pptx
 .coverage
 .env
 .venv/
