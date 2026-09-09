@@ -5,17 +5,17 @@
   "panels": [
     {
       "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
-      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2}, "unit": "short"}, "overrides": []},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2}, "unit": "short"}, "overrides": [{"matcher": {"id": "byName", "options": "bitcoin"}, "properties": [{"id": "color", "value": {"fixedColor": "#73BF69", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "ethereum"}, "properties": [{"id": "color", "value": {"fixedColor": "#B877D9", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "regulation"}, "properties": [{"id": "color", "value": {"fixedColor": "#F2495C", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "defi"}, "properties": [{"id": "color", "value": {"fixedColor": "#F2CC0C", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "security"}, "properties": [{"id": "color", "value": {"fixedColor": "#3274D9", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "markets"}, "properties": [{"id": "color", "value": {"fixedColor": "#8AB8FF", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "other"}, "properties": [{"id": "color", "value": {"fixedColor": "#FF780A", "mode": "fixed"}}]}]},
       "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
       "id": 1,
       "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), topic AS metric, SUM(article_count) AS value FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND ('$topic' = 'All' OR topic = '$topic') GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h', 0), topic AS metric, SUM(article_count) AS value FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND ('$topic' = 'All' OR topic = '$topic') GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
       "title": "News volume by topic",
       "type": "timeseries"
     },
     {
       "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
-      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 15, "lineWidth": 2}, "max": 1, "min": -1}, "overrides": []},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "spanNulls": true}, "max": 1, "min": -1}, "overrides": [{"matcher": {"id": "byName", "options": "bitcoin"}, "properties": [{"id": "color", "value": {"fixedColor": "#73BF69", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "ethereum"}, "properties": [{"id": "color", "value": {"fixedColor": "#B877D9", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "regulation"}, "properties": [{"id": "color", "value": {"fixedColor": "#F2495C", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "defi"}, "properties": [{"id": "color", "value": {"fixedColor": "#F2CC0C", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "security"}, "properties": [{"id": "color", "value": {"fixedColor": "#3274D9", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "markets"}, "properties": [{"id": "color", "value": {"fixedColor": "#8AB8FF", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "other"}, "properties": [{"id": "color", "value": {"fixedColor": "#FF780A", "mode": "fixed"}}]}]},
       "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
       "id": 2,
       "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
