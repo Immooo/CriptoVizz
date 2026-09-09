@@ -130,6 +130,8 @@ $ docker compose up --build
 
 - Use `raw_news` and `enriched_news` as durable queues.
 - Acknowledge messages only after successful processing.
+- Route invalid messages to `raw_news.dlq` or `enriched_news.dlq` for inspection
+  instead of losing them.
 
 **<h3>Data Processing and Analytics:</h3>**
 

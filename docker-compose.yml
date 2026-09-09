@@ -48,6 +48,7 @@ services:
       RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news}
       ANALYTICS_QUEUE: ${ANALYTICS_QUEUE:-enriched_news}
       ANALYTICS_PREFETCH_COUNT: ${ANALYTICS_PREFETCH_COUNT:-50}
+      DEAD_LETTER_EXCHANGE: ${DEAD_LETTER_EXCHANGE:-dead_letter}
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -70,6 +71,7 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       STORAGE_PREFETCH_COUNT: ${STORAGE_PREFETCH_COUNT:-50}
+      DEAD_LETTER_EXCHANGE: ${DEAD_LETTER_EXCHANGE:-dead_letter}
     depends_on:
       mysql:
         condition: service_healthy

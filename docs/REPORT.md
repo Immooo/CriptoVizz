@@ -71,7 +71,9 @@ retention requirements justify their operational cost.
 ## Reliability and operations
 
 Workers reconnect when RabbitMQ or MySQL is temporarily unavailable. Invalid
-messages are rejected, while transient processing failures are requeued. Database
+messages are rejected into durable dead-letter queues, while transient processing
+failures are requeued. The DLQs preserve the failed payloads for diagnosis and
+controlled replay instead of retrying permanent errors forever. Database
 credentials are supplied through environment variables. Runtime data is stored in
 Docker volumes and is not committed to Git. Raw articles are retained for 30 days
 by default; compact hourly analytics remain available for longer-term trends.

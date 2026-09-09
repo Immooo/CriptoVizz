@@ -44,6 +44,28 @@ CREATE TABLE IF NOT EXISTS pipeline_hourly (
     INDEX idx_pipeline_bucket (bucket_start)
 );
 """
+DEAD_LETTER_EXCHANGE = os.getenv("DEAD_LETTER_EXCHANGE", "dead_letter")
+
+
+def declare_queue_with_dlq(channel, queue_name):
+    """Declare a durable work queue and route rejected messages to a DLQ."""
+    dead_letter_queue = f"{queue_name}.dlq"
+    channel.exchange_declare(
+        exchange=DEAD_LETTER_EXCHANGE,
+        exchange_type="direct",
+        durable=True,
+    )
+    channel.queue_declare(queue=dead_letter_queue, durable=True)
+    channel.queue_bind(
+        exchange=DEAD_LETTER_EXCHANGE,
+        queue=dead_letter_queue,
+        routing_key=queue_name,
+    )
+    channel.queue_declare(
+        queue=queue_name,
+        durable=True,
+        arguments={"x-dead-letter-exchange": DEAD_LETTER_EXCHANGE},
+    )
 
 
 def utc_naive(value):
@@ -157,7 +179,7 @@ class StorageConsumer:
                     pika.URLParameters(self.rabbitmq_url)
                 )
                 channel = connection.channel()
-                channel.queue_declare(queue=self.queue, durable=True)
+                declare_queue_with_dlq(channel, self.queue)
                 channel.basic_qos(prefetch_count=self.prefetch_count)
 
                 def callback(ch, method, properties, body):

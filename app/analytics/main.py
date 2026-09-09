@@ -11,6 +11,28 @@ RAW_QUEUE = os.getenv("RAW_NEWS_QUEUE", "raw_news")
 ANALYTICS_QUEUE = os.getenv("ANALYTICS_QUEUE", "enriched_news")
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672")
 PREFETCH_COUNT = int(os.getenv("ANALYTICS_PREFETCH_COUNT", "50"))
+DEAD_LETTER_EXCHANGE = os.getenv("DEAD_LETTER_EXCHANGE", "dead_letter")
+
+
+def declare_queue_with_dlq(channel, queue_name):
+    """Declare a durable work queue and its durable dead-letter queue."""
+    dead_letter_queue = f"{queue_name}.dlq"
+    channel.exchange_declare(
+        exchange=DEAD_LETTER_EXCHANGE,
+        exchange_type="direct",
+        durable=True,
+    )
+    channel.queue_declare(queue=dead_letter_queue, durable=True)
+    channel.queue_bind(
+        exchange=DEAD_LETTER_EXCHANGE,
+        queue=dead_letter_queue,
+        routing_key=queue_name,
+    )
+    channel.queue_declare(
+        queue=queue_name,
+        durable=True,
+        arguments={"x-dead-letter-exchange": DEAD_LETTER_EXCHANGE},
+    )
 
 
 def run():
@@ -18,8 +40,8 @@ def run():
         try:
             connection = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
             channel = connection.channel()
-            channel.queue_declare(queue=RAW_QUEUE, durable=True)
-            channel.queue_declare(queue=ANALYTICS_QUEUE, durable=True)
+            declare_queue_with_dlq(channel, RAW_QUEUE)
+            declare_queue_with_dlq(channel, ANALYTICS_QUEUE)
             channel.confirm_delivery()
             channel.basic_qos(prefetch_count=PREFETCH_COUNT)
 
