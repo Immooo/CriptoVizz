@@ -120,6 +120,15 @@ $ docker compose up --build
 
 ```
 
+To demonstrate horizontal processing, start three competing Analytics consumers:
+
+```bash
+docker compose up --build --scale analytics=3
+```
+
+RabbitMQ distributes `raw_news` messages across the replicas. The prefetch limit
+prevents one replica from reserving the entire backlog.
+
 **<h3>Scraping Module:</h3>**
 
 - Poll one or more RSS feeds configured with `NEWS_FEED_URLS`.

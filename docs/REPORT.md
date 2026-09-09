@@ -68,6 +68,12 @@ RabbitMQ distributes messages between them and MySQL uniqueness prevents duplica
 articles. Kafka, Spark, and a data lake are deliberately deferred until volume or
 retention requirements justify their operational cost.
 
+The Analytics service deliberately has no fixed Compose `container_name`, so its
+consumer group can be demonstrated locally with
+`docker compose up --build --scale analytics=3`. This is horizontal scaling of the
+stateless processing stage; RabbitMQ and MySQL remain single-node dependencies in
+the local prototype.
+
 ## Reliability and operations
 
 Workers reconnect when RabbitMQ or MySQL is temporarily unavailable. Invalid

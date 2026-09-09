@@ -41,7 +41,6 @@ services:
   ### Online Analytics Builder (consumer and producer)
   analytics:
     build: ./app/analytics
-    container_name: analytics
     restart: always
     environment:
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
