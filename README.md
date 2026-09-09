@@ -156,8 +156,3 @@ Docker Compose isole les services, réseaux, variables d’environnement et volu
 Le service Analytics peut être répliqué avec `--scale` pour tester la distribution
 du travail.
 
-## 📚 Documentation complémentaire
-
-- [Rapport d’architecture et choix techniques](docs/REPORT.md)
-- [Préparation de la soutenance](docs/PREPARATION_SOUTENANCE.md)
-- [Plan d’entraînement personnalisé et suivi des acquis](docs/PLAN_ENTRAINEMENT_PERSONNALISE.md)
