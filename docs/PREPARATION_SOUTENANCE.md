@@ -82,7 +82,8 @@ Grafana
 13. **Docker Compose** : décrit services, variables, dépendances, réseaux et volumes.
     Chaque composant reste isolé et reproductible.
 14. **Healthchecks, reconnexion et panne** : Compose attend MySQL et RabbitMQ. Les
-    workers retentent leurs connexions. Un échec transitoire provoque un NACK avec requeue.
+    workers retentent leurs connexions. Un échec transitoire provoque un NACK avec
+    requeue ; un message invalide est conservé dans une dead-letter queue.
 
 ### Niveau 3 - bonus
 
@@ -95,13 +96,18 @@ Grafana
 - RabbitMQ et MySQL sont chacun un point de défaillance unique dans Compose.
 - Le sentiment lexical ne comprend pas le contexte complexe.
 - Deux sources RSS donnent peu de variété et un volume de démonstration.
-- Il n'existe ni dead-letter queue ni réplication multi-nœuds.
+- Les dead-letter queues conservent les messages invalides, mais leur rejeu reste
+  une opération manuelle et il n'existe pas de réplication multi-nœuds.
 - `restart` améliore la reprise, mais ne remplace pas une orchestration haute disponibilité.
 - La mesure de latence commence à `collected_at`, pas à la publication chez l'éditeur.
 
 Formulation crédible : « Le volume de la démonstration est volontairement limité.
 L'architecture reprend toutefois des principes de pipelines Big Data et prépare une
 montée en charge mesurable. »
+
+Preuve de scaling horizontal : `docker compose up --build --scale analytics=3`
+lance trois consommateurs concurrents sur `raw_news`. RabbitMQ distribue les
+messages entre eux et le prefetch évite qu'un seul worker réserve tout le backlog.
 
 ## Planning du lundi 7 au jeudi 10 septembre
 
@@ -312,4 +318,3 @@ Ferme maintenant ce document et réponds sans regarder :
 dashboard Grafana, en indiquant les deux formats de message, les deux ACK possibles,
 le mécanisme anti-doublon et ce qui se passe si Storage crash après l'INSERT mais
 avant l'ACK.**
-
