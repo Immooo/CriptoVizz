@@ -49,7 +49,7 @@ conserve l'historique réel de la préparation.
 1. Distinguer précisément prefetch, back-pressure, throughput et latency.
 2. Maîtriser DLQ, redelivery après publication et idempotence concrète.
 3. Expliquer les SPOF, la panne MySQL et pourquoi Compose n'est pas de la HA.
-4. Rendre le parcours exact avec `raw_news_v3`, `enriched_news_v3` et des messages JSON.
+4. Rendre le parcours exact avec `raw_news`, `enriched_news` et des messages JSON.
 5. Justifier MySQL face à MongoDB sans caricaturer NoSQL.
 6. Répondre en 30 à 45 secondes, après une courte réflexion, sans « en gros » ni « du coup ».
 
@@ -248,12 +248,12 @@ PowerPoint et ne pas ajouter une heure de révision.
 CoinDesk + Cointelegraph
         ↓ lecture RSS périodique
 Scraper Python — producteur
-        ↓ raw_news_v3
+        ↓ raw_news
 RabbitMQ — queue durable + messages persistants
         ↓ consommation avec ACK manuel
 Analytics — consumer puis producteur
         ↓ sentiment + topics
-        ↓ enriched_news_v3
+        ↓ enriched_news
 RabbitMQ
         ↓ consommation avec ACK manuel
 Storage Worker
@@ -263,8 +263,8 @@ MySQL
 Grafana — 6 panneaux et rafraîchissement 30 s
 ```
 
-Les messages invalides peuvent être dirigés vers `raw_news_v3.dlq` et
-`enriched_news_v3.dlq`. Le service `clean` applique une rétention de 30 jours par
+Les messages invalides peuvent être dirigés vers `raw_news.dlq` et
+`enriched_news.dlq`. Le service `clean` applique une rétention de 30 jours par
 défaut aux données brutes. Les agrégats permettent de conserver les tendances.
 
 ### Les phrases à ne pas dire
@@ -284,9 +284,9 @@ défaut aux données brutes. Les agrégats permettent de conserver les tendances
 | Élément | Responsabilité | Preuve ou configuration |
 |---|---|---|
 | Scraper | Collecter, normaliser et publier | Deux RSS, intervalle configurable |
-| `raw_news_v3` | Transporter les événements bruts | Queue durable, DLQ associée |
+| `raw_news` | Transporter les événements bruts | Queue durable, DLQ associée |
 | Analytics | Enrichir sentiment et topics | Consumer concurrent, `prefetch_count=50` |
-| `enriched_news_v3` | Transporter les événements enrichis | Queue durable, DLQ associée |
+| `enriched_news` | Transporter les événements enrichis | Queue durable, DLQ associée |
 | Storage | Dédupliquer, stocker et agréger | ACK après transaction réussie |
 | MySQL | Articles et tables analytiques | `news_articles`, `analytics_hourly`, `pipeline_hourly` |
 | Grafana | Exploration et observabilité | Volume, sentiment, articles, débit, latence |
@@ -308,7 +308,7 @@ Objectif : réponse claire en 20 à 40 secondes. Une erreur ici est prioritaire.
 | 5 | Qu'est-ce qu'un consumer ? | Reçoit, traite, confirme ou rejette | 🟢 | ✓ | ✓ | ⬜ |
 | 6 | Quels sont les producteurs et consumers ici ? | Scraper, Analytics double rôle, Storage | 🟠 | ✓ | ⬜ | ⬜ |
 | 7 | Pourquoi RabbitMQ ? | Découplage, tampon, fiabilité, rythmes différents | 🟢 | ✓ | ✓ | ⬜ |
-| 8 | Quelles queues existent ? | `raw_news_v3`, `enriched_news_v3`, deux `.dlq` | 🟠 | ✓ | ⬜ | ⬜ |
+| 8 | Quelles queues existent ? | `raw_news`, `enriched_news`, deux `.dlq` | 🟠 | ✓ | ⬜ | ⬜ |
 | 9 | Que produit Analytics ? | Score, label de sentiment, liste de topics | 🟢 | ✓ | ⬜ | ⬜ |
 | 10 | Pourquoi MySQL ? | Structure, contraintes, requêtes SQL, volume de démo | 🟠 | ✓ | ⬜ | ⬜ |
 | 11 | Que contient `news_articles` ? | Articles enrichis et dédupliqués | 🟡 | ⬜ | ⬜ | ⬜ |
@@ -329,9 +329,9 @@ Objectif : réponse claire en 20 à 40 secondes. Une erreur ici est prioritaire.
 
 **Parcours d'un article**
 
-> Le scraper lit un flux RSS, normalise l'article et le publie dans `raw_news_v3`.
+> Le scraper lit un flux RSS, normalise l'article et le publie dans `raw_news`.
 > Analytics consomme ce message, calcule le sentiment et les topics, publie le JSON
-> enrichi dans `enriched_news_v3`, puis acquitte le message brut. Storage consomme
+> enrichi dans `enriched_news`, puis acquitte le message brut. Storage consomme
 > le message enrichi, effectue une transaction idempotente dans MySQL et envoie son
 > ACK après réussite. Grafana interroge ensuite MySQL directement.
 
@@ -486,7 +486,7 @@ puis annoncer clairement la limite et l'évolution possible.
 ### Exercice D — démonstration nominale, 3 à 5 minutes
 
 1. Montrer `docker compose ps`.
-2. Montrer dans RabbitMQ les queues `raw_news_v3` et `enriched_news_v3`.
+2. Montrer dans RabbitMQ les queues `raw_news` et `enriched_news`.
 3. Montrer les consumers et expliquer le prefetch.
 4. Montrer dans Grafana la période, le filtre topic et les six panneaux.
 5. Commenter un résultat réel, pas seulement l'interface.
@@ -553,7 +553,7 @@ habitude orale à corriger. Refaire uniquement les trois passages faibles.
 
 ### Pipeline
 
-`RSS → scraper → raw_news_v3 → Analytics → enriched_news_v3 → Storage → MySQL → Grafana`
+`RSS → scraper → raw_news → Analytics → enriched_news → Storage → MySQL → Grafana`
 
 ### Trois décisions fortes
 
@@ -621,7 +621,7 @@ l'historique Git de la préparation.
 - [ ] Distinguer queue durable, message persistant et ACK.
 - [ ] Défendre le Big Data sans prétendre avoir un volume massif.
 - [ ] Citer au moins quatre goulots possibles en cas de charge ×100.
-- [ ] Dire `raw_news_v3` et `enriched_news_v3`, pas les anciens noms.
+- [ ] Dire exactement `raw_news` et `enriched_news`, comme dans `.env.example` et RabbitMQ.
 - [ ] Parler de messages JSON, jamais de « fichiers » dans RabbitMQ.
 - [ ] Dire que `prefetch_count=50` limite 50 messages livrés non acquittés par consumer, pas 50 ACK.
 - [ ] Ne pas présenter le prefetch comme la capacité globale de RabbitMQ ni comme une hausse automatique du débit.

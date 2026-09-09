@@ -29,7 +29,7 @@ services:
     restart: always
     environment:
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
-      RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news_v3}
+      RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news}
       DEAD_LETTER_EXCHANGE: ${DEAD_LETTER_EXCHANGE:-dead_letter}
       NEWS_FEED_URLS: ${NEWS_FEED_URLS:-https://www.coindesk.com/arc/outboundfeeds/rss/,https://cointelegraph.com/rss}
       SCRAPE_INTERVAL_SECONDS: ${SCRAPE_INTERVAL_SECONDS:-60}
@@ -45,8 +45,8 @@ services:
     restart: always
     environment:
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
-      RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news_v3}
-      ANALYTICS_QUEUE: ${ANALYTICS_QUEUE:-enriched_news_v3}
+      RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news}
+      ANALYTICS_QUEUE: ${ANALYTICS_QUEUE:-enriched_news}
       ANALYTICS_PREFETCH_COUNT: ${ANALYTICS_PREFETCH_COUNT:-50}
       DEAD_LETTER_EXCHANGE: ${DEAD_LETTER_EXCHANGE:-dead_letter}
     depends_on:
@@ -64,7 +64,7 @@ services:
     restart: always
     environment:
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
-      ANALYTICS_QUEUE: ${ANALYTICS_QUEUE:-enriched_news_v3}
+      ANALYTICS_QUEUE: ${ANALYTICS_QUEUE:-enriched_news}
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
       MYSQL_DATABASE: ${MYSQL_DATABASE}

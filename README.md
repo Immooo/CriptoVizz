@@ -18,6 +18,10 @@ Les données d’exécution sont conservées dans des volumes Docker. Le dashboa
 la configuration de la datasource sont provisionnés depuis les fichiers versionnés
 du dossier `grafana/`.
 
+Le [rapport d’architecture et de choix techniques](docs/RAPPORT_ARCHITECTURE.md)
+décrit le parcours des données, les garanties de fiabilité, les limites et les
+évolutions possibles.
+
 ## ✨ Fonctionnalités
 
 - Collecte continue de flux RSS d’actualités crypto.
@@ -50,24 +54,24 @@ Installer [Git](https://git-scm.com/) et [Docker Desktop](https://www.docker.com
 ## 🏗️ Architecture
 
 Le scraper interroge les flux RSS et publie des événements normalisés dans
-`raw_news_v3`. Le service Analytics consomme cette queue, calcule le sentiment et
-les thèmes, puis publie les événements enrichis dans `enriched_news_v3`. Le worker
+`raw_news`. Le service Analytics consomme cette queue, calcule le sentiment et
+les thèmes, puis publie les événements enrichis dans `enriched_news`. Le worker
 Storage déduplique les articles, écrit les données et met à jour les agrégats
 horaires dans MySQL. Grafana interroge ces agrégats automatiquement.
 
 ```mermaid
 flowchart LR
   RSS[Flux RSS crypto] --> Scraper
-  Scraper -->|raw_news_v3| RabbitMQ
+  Scraper -->|raw_news| RabbitMQ
   RabbitMQ --> Analytics
-  Analytics -->|enriched_news_v3| RabbitMQ
+  Analytics -->|enriched_news| RabbitMQ
   RabbitMQ --> Storage
   Storage --> MySQL
   MySQL --> Grafana
 ```
 
-Les queues invalides sont routées vers `raw_news_v3.dlq` et
-`enriched_news_v3.dlq`. Les messages valides utilisent une livraison au moins une
+Les queues invalides sont routées vers `raw_news.dlq` et
+`enriched_news.dlq`. Les messages valides utilisent une livraison au moins une
 fois, avec déduplication idempotente côté MySQL.
 
 ### Données initiales
@@ -90,7 +94,7 @@ MySQL contient notamment :
 - sentiment moyen et distribution des sentiments ;
 - derniers articles analysés ;
 - débit d’ingestion par source ;
-- latence moyenne et maximale par source.
+- latence moyenne par source.
 
 ## ▶️ Démarrage
 
@@ -117,7 +121,7 @@ Pour démontrer le scaling horizontal du traitement Analytics :
 docker compose up --build --scale analytics=3
 ```
 
-RabbitMQ répartit les messages de `raw_news_v3` entre les trois consommateurs.
+RabbitMQ répartit les messages de `raw_news` entre les trois consommateurs.
 La limite de prefetch empêche une seule instance de réserver tout le backlog.
 
 ## 🧩 Services
@@ -125,13 +129,13 @@ La limite de prefetch empêche une seule instance de réserver tout le backlog.
 ### Scraper
 
 - Lit les URL définies dans `NEWS_FEED_URLS`.
-- Normalise et déduplique les articles avant publication.
+- Normalise les articles et leur attribue un identifiant déterministe avant publication.
 - Recommence selon `SCRAPE_INTERVAL_SECONDS`.
 
 ### Queues
 
-- `raw_news_v3` transporte les articles bruts.
-- `enriched_news_v3` transporte les événements enrichis.
+- `raw_news` transporte les articles bruts.
+- `enriched_news` transporte les événements enrichis.
 - Les `.dlq` conservent les messages invalides pour diagnostic et rejeu contrôlé.
 - Un message n’est acquitté qu’après traitement réussi.
 

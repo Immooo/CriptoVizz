@@ -7,7 +7,7 @@ import pika
 from cryptoscrap import CryptoNewsScraper
 
 
-RAW_QUEUE = os.getenv("RAW_NEWS_QUEUE", "raw_news_v3")
+RAW_QUEUE = os.getenv("RAW_NEWS_QUEUE", "raw_news")
 DEAD_LETTER_EXCHANGE = os.getenv("DEAD_LETTER_EXCHANGE", "dead_letter")
 POLL_INTERVAL_SECONDS = int(os.getenv("SCRAPE_INTERVAL_SECONDS", "60"))
 

@@ -25,8 +25,8 @@ Sources :
 ## Architecture réelle en une phrase
 
 Deux flux RSS sont lus chaque minute par un producteur Python. Les articles
-normalisés passent par `raw_news_v3`, sont enrichis en continu par le service
-Analytics, passent par `enriched_news_v3`, puis un worker les déduplique, les stocke
+normalisés passent par `raw_news`, sont enrichis en continu par le service
+Analytics, passent par `enriched_news`, puis un worker les déduplique, les stocke
 et met à jour des agrégats horaires dans MySQL. Grafana relit ces données toutes
 les 30 secondes.
 
@@ -34,11 +34,11 @@ les 30 secondes.
 CoinDesk + Cointelegraph
         ↓ JSON brut normalisé
 Scraper Python
-        ↓ raw_news_v3
+        ↓ raw_news
 RabbitMQ
         ↓
 Analytics Builder
-        ↓ enriched_news_v3, JSON enrichi
+        ↓ enriched_news, JSON enrichi
 RabbitMQ
         ↓
 Storage Worker
@@ -56,8 +56,8 @@ Grafana
    les événements. Ici, chaque article suit le parcours RSS vers Grafana.
 2. **Producteur et consommateur** : le scraper produit, Analytics consomme puis
    reproduit, Storage consomme. Ce découplage évite les appels directs entre services.
-3. **RabbitMQ et queues** : broker qui tamponne les événements dans `raw_news_v3` et
-   `enriched_news_v3`, avec leurs DLQ associées. L'exchange utilisé est l'exchange
+3. **RabbitMQ et queues** : broker qui tamponne les événements dans `raw_news` et
+   `enriched_news`, avec leurs DLQ associées. L'exchange utilisé est l'exchange
    direct par défaut.
 4. **ACK** : confirmation envoyée après réussite. Avant l'ACK, un crash peut provoquer
    une nouvelle livraison. Le système vise donc une livraison au moins une fois.
@@ -76,7 +76,7 @@ Grafana
    risque de perte lors d'un redémarrage, sans constituer seuls une garantie absolue.
 10. **Back-pressure** : la queue absorbe un écart temporaire de débit et `basic_qos`
     limite à 50 les messages non acquittés par worker.
-11. **Scaling horizontal** : plusieurs replicas Analytics peuvent partager `raw_news_v3`.
+11. **Scaling horizontal** : plusieurs replicas Analytics peuvent partager `raw_news`.
     RabbitMQ répartit les messages entre consommateurs concurrents.
 12. **MySQL et indexes** : clé primaire pour la déduplication, indexes temporels et par
     source pour accélérer les requêtes usuelles. MySQL convient au volume de la démo.
@@ -107,7 +107,7 @@ L'architecture reprend toutefois des principes de pipelines Big Data et prépare
 montée en charge mesurable. »
 
 Preuve de scaling horizontal : `docker compose up --build --scale analytics=3`
-lance trois consommateurs concurrents sur `raw_news_v3`. RabbitMQ distribue les
+lance trois consommateurs concurrents sur `raw_news`. RabbitMQ distribue les
 messages entre eux et le prefetch évite qu'un seul worker réserve tout le backlog.
 
 ## Planning du lundi 7 au jeudi 10 septembre
@@ -117,7 +117,7 @@ messages entre eux et le prefetch évite qu'un seul worker réserve tout le back
 | Durée | Objectif | Méthode et exercice | Production sans notes |
 |---|---|---|---|
 | 09:00-09:45 | Vue globale | Dessin de mémoire, puis comparaison au code | Architecture complète en 90 s |
-| 10:00-10:45 | Scraper et messages | Expliquer un JSON brut, retrouver chaque champ | Parcours RSS vers `raw_news_v3` |
+| 10:00-10:45 | Scraper et messages | Expliquer un JSON brut, retrouver chaque champ | Parcours RSS vers `raw_news` |
 | 11:00-11:45 | RabbitMQ | Questions ACK, durable, persistant, panne | Expliquer un crash avant/après ACK |
 | 14:00-14:45 | Analytics | Prédire thème et sentiment de 5 titres | Entrée, calcul, sortie enrichie |
 | 15:00-15:45 | Storage et MySQL | Refaire le schéma sur papier | Déduplication et agrégation |
@@ -189,8 +189,8 @@ conclusion en 30 s.
 
 ## Démonstration en 3 à 5 minutes
 
-1. `docker compose ps` : montrer six services actifs.
-2. RabbitMQ Management : montrer `raw_news_v3`, `enriched_news_v3`, leurs DLQ et leurs consumers.
+1. `docker compose ps` : montrer neuf conteneurs actifs pour sept services, dont trois replicas Analytics.
+2. RabbitMQ Management : montrer `raw_news`, `enriched_news`, leurs deux DLQ et leurs consumers.
 3. MySQL : montrer le nombre d'articles, les sources et `pipeline_hourly`.
 4. Grafana : changer la période, le thème et commenter débit puis latence.
 
@@ -266,7 +266,7 @@ Réponses pivots, 20 à 40 secondes :
 
 ### Architecture
 
-`RSS > scraper > raw_news_v3 > analytics > enriched_news_v3 > storage > MySQL > Grafana`
+`RSS > scraper > raw_news > analytics > enriched_news > storage > MySQL > Grafana`
 JSON, queues durables, ACK après succès, identifiant déterministe, agrégats horaires.
 
 ### RabbitMQ
@@ -280,7 +280,7 @@ n'est pas une sauvegarde générale et exige diagnostic puis rejeu contrôlé.
 
 ### Docker
 
-6 services, images reproductibles, 2 réseaux, 3 volumes nommés, `depends_on`,
+7 services, 9 conteneurs avec trois replicas Analytics, 2 réseaux, 3 volumes nommés, `depends_on`,
 healthchecks MySQL/RabbitMQ, variables `.env`, restart policies. Compose facilite
 le déploiement et la reprise, mais ne garantit pas la haute disponibilité.
 
@@ -344,13 +344,13 @@ confirmer par rappel différé le 10 septembre.
 
 1. DLQ et distinction erreur temporaire/permanente.
 2. `prefetch_count=50`, back-pressure et absence de gain automatique de throughput.
-3. Publication dans `enriched_news_v3` puis crash avant ACK : redelivery et doublon possible.
+3. Publication dans `enriched_news` puis crash avant ACK : redelivery et doublon possible.
 4. Idempotence : SHA-256 de l'URL, clé primaire, `INSERT IGNORE` et agrégats conditionnels.
 5. Throughput, latency entre `collected_at` et stockage, backlog et recherche du vrai goulot.
 6. SPOF : RabbitMQ mono-nœud, MySQL mono-nœud et machine Docker locale.
 7. Panne MySQL : échec d'écriture, absence d'ACK, NACK/requeue, reconnexion et backlog.
 8. MySQL face à MongoDB : structure, unicité, agrégations temporelles et SQL pour Grafana.
-9. Parcours complet avec `raw_news_v3`, `enriched_news_v3` et le terme message JSON.
+9. Parcours complet avec `raw_news`, `enriched_news` et le terme message JSON.
 
 ### Suite du 09/09/2026
 
