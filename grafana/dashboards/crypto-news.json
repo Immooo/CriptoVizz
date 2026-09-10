@@ -1,77 +1,540 @@
 {
-  "annotations": {"list": []},
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "graphTooltip": 1,
   "panels": [
     {
-      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
-      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2}, "unit": "short"}, "overrides": [{"matcher": {"id": "byName", "options": "bitcoin"}, "properties": [{"id": "color", "value": {"fixedColor": "#73BF69", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "ethereum"}, "properties": [{"id": "color", "value": {"fixedColor": "#B877D9", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "regulation"}, "properties": [{"id": "color", "value": {"fixedColor": "#F2495C", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "defi"}, "properties": [{"id": "color", "value": {"fixedColor": "#F2CC0C", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "security"}, "properties": [{"id": "color", "value": {"fixedColor": "#3274D9", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "markets"}, "properties": [{"id": "color", "value": {"fixedColor": "#8AB8FF", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "other"}, "properties": [{"id": "color", "value": {"fixedColor": "#FF780A", "mode": "fixed"}}]}]},
-      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-crypto-news"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 65,
+            "lineWidth": 2,
+            "showPoints": "always",
+            "pointSize": 5
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "bitcoin"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ethereum"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#B877D9",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "regulation"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2495C",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "defi"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2CC0C",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "security"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#3274D9",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "markets"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#8AB8FF",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "other"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF780A",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
-      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h', 0), topic AS metric, SUM(article_count) AS value FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND topic IN (${topic:sqlstring}) GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT GREATEST($__unixEpochFrom(), FLOOR(UNIX_TIMESTAMP(event_time) / (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 THEN 60 ELSE 3600 END))) * (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 THEN 60 ELSE 3600 END))) AS time, topic AS metric, SUM(article_count) AS value FROM (SELECT a.published_at AS event_time, t.topic, 1 AS article_count, a.sentiment_score AS sentiment_sum FROM news_articles a JOIN JSON_TABLE(a.topics, '$[*]' COLUMNS(topic VARCHAR(80) PATH '$')) t WHERE $__timeFilter(a.published_at) AND ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 UNION ALL SELECT bucket_start AS event_time, topic, article_count, sentiment_sum FROM analytics_hourly WHERE bucket_start <= $__timeTo() AND bucket_start + INTERVAL 1 HOUR > $__timeFrom() AND ($__unixEpochTo() - $__unixEpochFrom()) > 86400) samples WHERE topic IN (${topic:sqlstring}) GROUP BY 1, 2 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
       "title": "News volume by topic",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Up to 24 hours: exact publication-time filter with adaptive intervals (minimum 1 minute). Longer ranges use retained hourly aggregates; boundary hours may be partial. Articles may belong to several topics.",
+      "interval": "1m"
     },
     {
-      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
-      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "spanNulls": true}, "max": 1, "min": -1}, "overrides": [{"matcher": {"id": "byName", "options": "bitcoin"}, "properties": [{"id": "color", "value": {"fixedColor": "#73BF69", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "ethereum"}, "properties": [{"id": "color", "value": {"fixedColor": "#B877D9", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "regulation"}, "properties": [{"id": "color", "value": {"fixedColor": "#F2495C", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "defi"}, "properties": [{"id": "color", "value": {"fixedColor": "#F2CC0C", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "security"}, "properties": [{"id": "color", "value": {"fixedColor": "#3274D9", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "markets"}, "properties": [{"id": "color", "value": {"fixedColor": "#8AB8FF", "mode": "fixed"}}]}, {"matcher": {"id": "byName", "options": "other"}, "properties": [{"id": "color", "value": {"fixedColor": "#FF780A", "mode": "fixed"}}]}]},
-      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-crypto-news"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "spanNulls": false,
+            "showPoints": "always",
+            "pointSize": 6
+          },
+          "max": 1,
+          "min": -1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "bitcoin"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ethereum"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#B877D9",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "regulation"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2495C",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "defi"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2CC0C",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "security"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#3274D9",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "markets"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#8AB8FF",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "other"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF780A",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
       "id": 2,
-      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), topic AS metric, SUM(sentiment_sum) / NULLIF(SUM(article_count), 0) AS value FROM analytics_hourly WHERE $__timeFilter(bucket_start) AND topic IN (${topic:sqlstring}) GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT GREATEST($__unixEpochFrom(), FLOOR(UNIX_TIMESTAMP(event_time) / (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 THEN 60 ELSE 3600 END))) * (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 THEN 60 ELSE 3600 END))) AS time, topic AS metric, SUM(sentiment_sum) / NULLIF(SUM(article_count), 0) AS value FROM (SELECT a.published_at AS event_time, t.topic, 1 AS article_count, a.sentiment_score AS sentiment_sum FROM news_articles a JOIN JSON_TABLE(a.topics, '$[*]' COLUMNS(topic VARCHAR(80) PATH '$')) t WHERE $__timeFilter(a.published_at) AND ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 UNION ALL SELECT bucket_start AS event_time, topic, article_count, sentiment_sum FROM analytics_hourly WHERE bucket_start <= $__timeTo() AND bucket_start + INTERVAL 1 HOUR > $__timeFrom() AND ($__unixEpochTo() - $__unixEpochFrom()) > 86400) samples WHERE topic IN (${topic:sqlstring}) GROUP BY 1, 2 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
       "title": "Average sentiment over time",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Up to 24 hours: exact publication-time filter with adaptive intervals (minimum 1 minute). Longer ranges use retained hourly aggregates; boundary hours may be partial. Articles may belong to several topics.",
+      "interval": "1m"
     },
     {
-      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
-      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 75, "stacking": {"group": "A", "mode": "normal"}}, "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9},
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-crypto-news"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 65,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "drawStyle": "bars",
+            "showPoints": "always",
+            "pointSize": 5
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
       "id": 3,
-      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(published_at, '1h'), SUM(sentiment_label = 'positive') AS positive, SUM(sentiment_label = 'neutral') AS neutral, SUM(sentiment_label = 'negative') AS negative FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring})) GROUP BY 1 ORDER BY 1", "refId": "A"}],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT GREATEST($__unixEpochFrom(), FLOOR(UNIX_TIMESTAMP(published_at) / (GREATEST($__interval_ms / 1000, 60))) * (GREATEST($__interval_ms / 1000, 60))) AS time, SUM(sentiment_label = 'positive') AS positive, SUM(sentiment_label = 'neutral') AS neutral, SUM(sentiment_label = 'negative') AS negative FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring})) GROUP BY 1 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
       "title": "Sentiment distribution",
-      "type": "timeseries"
+      "type": "timeseries",
+      "interval": "1m"
     },
     {
-      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
-      "fieldConfig": {"defaults": {}, "overrides": []},
-      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 9},
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-crypto-news"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
       "id": 4,
-      "options": {"showHeader": true, "cellHeight": "sm"},
-      "targets": [{"format": "table", "rawQuery": true, "rawSql": "SELECT published_at AS Published, source AS Source, title AS Title, sentiment_label AS Sentiment, JSON_UNQUOTE(topics) AS Topics, url AS URL FROM news_articles WHERE $__timeFilter(published_at) ORDER BY published_at DESC LIMIT 100", "refId": "A"}],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT published_at AS Published, source AS Source, title AS Title, sentiment_label AS Sentiment, JSON_UNQUOTE(topics) AS Topics, url AS URL FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring})) ORDER BY published_at DESC LIMIT 100",
+          "refId": "A"
+        }
+      ],
       "title": "Latest analyzed news",
       "type": "table"
     },
     {
-      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
-      "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 70}, "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18},
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-crypto-news"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 65,
+            "showPoints": "always",
+            "pointSize": 5
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
       "id": 5,
-      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(collected_at, '1h'), source AS metric, COUNT(*) AS value FROM news_articles WHERE $__timeFilter(collected_at) GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT GREATEST($__unixEpochFrom(), FLOOR(UNIX_TIMESTAMP(collected_at) / (GREATEST($__interval_ms / 1000, 60))) * (GREATEST($__interval_ms / 1000, 60))) AS time, source AS metric, COUNT(*) AS value FROM news_articles WHERE $__timeFilter(collected_at) GROUP BY 1, 2 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
       "title": "Ingestion throughput by source",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Unique articles first collected during the selected period; repeated RSS polling is not counted again. Adaptive intervals, minimum 1 minute.",
+      "interval": "1m"
     },
     {
-      "datasource": {"type": "mysql", "uid": "mysql-crypto-news"},
-      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "fillOpacity": 15, "lineWidth": 2}, "unit": "ms"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 18},
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-crypto-news"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
       "id": 6,
-      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"format": "time_series", "rawQuery": true, "rawSql": "SELECT $__timeGroupAlias(bucket_start, '1h'), source AS metric, SUM(latency_sum_ms) / NULLIF(SUM(article_count), 0) AS value FROM pipeline_hourly WHERE $__timeFilter(bucket_start) GROUP BY 1, 2 ORDER BY 1", "refId": "A"}],
-      "title": "Average pipeline latency by source",
-      "type": "timeseries"
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT GREATEST($__unixEpochFrom(), UNIX_TIMESTAMP(bucket_start)) AS time, source AS metric, SUM(latency_sum_ms) / NULLIF(SUM(article_count), 0) AS value FROM pipeline_hourly WHERE bucket_start <= $__timeTo() AND bucket_start + INTERVAL 1 HOUR > $__timeFrom() GROUP BY 1, 2 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Average pipeline latency by source (hourly)",
+      "type": "timeseries",
+      "description": "Hourly averages for all hour buckets overlapping the selected period. This metric is stored hourly and cannot provide an exact five-minute average.",
+      "interval": "1m"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 41,
-  "tags": ["crypto", "news", "analytics", "big-data"],
-  "templating": {"list": [{"current": {"text": "All", "value": "$__all"}, "datasource": {"type": "mysql", "uid": "mysql-crypto-news"}, "definition": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic", "includeAll": true, "label": "Topic", "multi": true, "name": "topic", "query": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic", "refresh": 1, "type": "query"}]},
-  "time": {"from": "now-24h", "to": "now"},
+  "tags": [
+    "crypto",
+    "news",
+    "analytics",
+    "big-data"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "mysql-crypto-news"
+        },
+        "definition": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic",
+        "includeAll": true,
+        "label": "Topic",
+        "multi": true,
+        "name": "topic",
+        "query": "SELECT DISTINCT topic FROM analytics_hourly ORDER BY topic",
+        "refresh": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "Crypto News Analytics",
   "uid": "crypto-news-analytics",
-  "version": 1
+  "version": 2
 }

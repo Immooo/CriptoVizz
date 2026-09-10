@@ -143,3 +143,13 @@ ne sont pas chiffrés par cette configuration. Le compte Docker de l’hôte res
 Voir [l’audit et ses limites](docs/SECURITY_REVIEW.md), le
 [rapport d’architecture](docs/RAPPORT_ARCHITECTURE.md) et la
 [politique de sécurité](SECURITY.md).
+
+### Périodes courtes dans Grafana
+
+Jusqu’à 24 heures, les volumes et sentiments utilisent les dates exactes des articles
+et des intervalles adaptatifs (minimum une minute). Les plages plus longues conservent
+les agrégats horaires historiques. La latence reste une moyenne horaire des blocs qui
+recouvrent la période. Sans nouvel article dans la fenêtre, une absence de données est normale.
+
+`python tests/integration_dashboard.py` vérifie les requêtes via Grafana avec des données
+fictives en lecture seule : fenêtre de cinq minutes, limites temporelles, filtres et historique.

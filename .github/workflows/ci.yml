@@ -27,6 +27,7 @@ jobs:
       - run: docker compose config --quiet
       - run: docker compose up -d --build --wait --wait-timeout 180
       - run: docker compose exec -T queue python - < tests/integration_pipeline.py
+      - run: python tests/integration_dashboard.py
       - if: always()
         run: docker compose logs --tail 50
       - if: always()
