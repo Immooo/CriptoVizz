@@ -1,162 +1,147 @@
-<h1 align="center">Crypto-Viz</h1>
+# Crypto Viz
 
-<p align="center">
-  <a href="#-présentation">Présentation</a> &#xa0; | &#xa0;
-  <a href="#-fonctionnalités">Fonctionnalités</a> &#xa0; | &#xa0;
-  <a href="#-technologies">Technologies</a> &#xa0; | &#xa0;
-  <a href="#-prérequis">Prérequis</a> &#xa0; | &#xa0;
-  <a href="#-architecture">Architecture</a> &#xa0; | &#xa0;
-  <a href="#-démarrage">Démarrage</a>
-</p>
+Pipeline d’actualités crypto : collecte RSS, analyse lexicale en continu, stockage
+idempotent dans MySQL et tableaux de bord Grafana. Déploiement local avec Docker
+Compose ; les données persistent dans des volumes, les dashboards sont versionnés.
 
-## 🎯 Présentation
-
-Crypto Viz collecte en continu des actualités sur les cryptomonnaies, les enrichit
-avec des analyses en ligne et affiche des indicateurs temporels dans Grafana.
-
-Les données d’exécution sont conservées dans des volumes Docker. Le dashboard et
-la configuration de la datasource sont provisionnés depuis les fichiers versionnés
-du dossier `grafana/`.
-
-Le [rapport d’architecture et de choix techniques](docs/RAPPORT_ARCHITECTURE.md)
-décrit le parcours des données, les garanties de fiabilité, les limites et les
-évolutions possibles.
-
-## ✨ Fonctionnalités
-
-- Collecte continue de flux RSS d’actualités crypto.
-- Ingestion de plusieurs sources configurables avec back-pressure.
-- Publication d’articles normalisés dans des queues RabbitMQ durables.
-- Analyse continue du sentiment, des thèmes et des agrégats horaires.
-- Conservation des messages invalides dans des dead-letter queues (`.dlq`).
-- Suppression automatique des articles bruts anciens, avec conservation des agrégats.
-- Visualisation dynamique avec rafraîchissement automatique et filtres temporels.
-
-## 🚀 Technologies
-
-- [Python](https://www.python.org/)
-- [Docker](https://www.docker.com/)
-- [Git](https://git-scm.com)
-- [MySQL](https://www.mysql.com/)
-- [RabbitMQ](https://www.rabbitmq.com/)
-- [Grafana](https://grafana.com/)
-
-Bibliothèques principales :
-
-- **feedparser** : lecture des flux RSS configurés ;
-- **mysql-connector-python** : connexion aux bases MySQL ;
-- **pika** : publication et consommation des messages RabbitMQ.
-
-## ✅ Prérequis
-
-Installer [Git](https://git-scm.com/) et [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-
-## 🏗️ Architecture
-
-Le scraper interroge les flux RSS et publie des événements normalisés dans
-`raw_news`. Le service Analytics consomme cette queue, calcule le sentiment et
-les thèmes, puis publie les événements enrichis dans `enriched_news`. Le worker
-Storage déduplique les articles, écrit les données et met à jour les agrégats
-horaires dans MySQL. Grafana interroge ces agrégats automatiquement.
+## Architecture
 
 ```mermaid
 flowchart LR
-  RSS[Flux RSS crypto] --> Scraper
-  Scraper -->|raw_news| RabbitMQ
-  RabbitMQ --> Analytics
-  Analytics -->|enriched_news| RabbitMQ
-  RabbitMQ --> Storage
-  Storage --> MySQL
-  MySQL --> Grafana
+  RSS[Flux RSS HTTP/S] --> scrap[Scraper]
+  scrap --> raw[raw_news]
+  raw --> analytics[Analytics réplicable]
+  analytics --> enriched[enriched_news]
+  enriched --> storage[Storage]
+  storage --> mysql[(MySQL)]
+  mysql --> grafana[Grafana : lecture seule]
+  clean[Nettoyage périodique] --> mysql
+  raw -. rejet .-> rawdlq[raw_news.dlq]
+  enriched -. rejet .-> dlq[enriched_news.dlq]
 ```
 
-Les queues invalides sont routées vers `raw_news.dlq` et
-`enriched_news.dlq`. Les messages valides utilisent une livraison au moins une
-fois, avec déduplication idempotente côté MySQL.
+RabbitMQ porte les deux files durables. Les publications sont persistantes et
+confirmées par le broker ; les consommateurs acquittent après publication confirmée
+ou commit SQL. La livraison est **au moins une fois**. L’identifiant SHA-256 de l’URL
+et une transaction regroupant article et agrégats rendent le stockage idempotent.
+Cela ne garantit pas la récupération d’un article disparu du RSS avant sa collecte.
 
-### Données initiales
+| Service | Rôle |
+| --- | --- |
+| `scrap` | Lit les flux toutes les 60 secondes ; requêtes avec timeout de 15 s et réponse limitée à 2 Mio. |
+| `analytics` | Calcule sentiment et thèmes par lexique ; valide le contrat des événements. |
+| `queue` | Valide et stocke ; met à jour les agrégats horaires dans une transaction. |
+| `clean` | Supprime les articles de plus de `RETENTION_DAYS` ; conserve les agrégats. |
+| `mysql` | Tables `news_articles`, `analytics_hourly`, `pipeline_hourly`. |
+| `rabbitmq` | Files de travail et files de rejet pour diagnostic. |
+| `grafana` | Dashboard provisionné, compte MySQL limité à `SELECT`. |
 
-L’application démarre sans données et se remplit à partir des flux RSS actifs.
-L’identifiant déterministe de chaque article évite les doublons entre deux cycles
-de polling.
+Les articles déjà hors rétention sont ignorés à l’ingestion pour empêcher leur
+recomptage après nettoyage. Le sentiment est une heuristique anglaise, pas un modèle
+financier prédictif. Les comptes par thème peuvent compter plusieurs fois un article
+multithème ; `pipeline_hourly` mesure les articles uniques ingérés.
 
-### Base de données
+## Installation neuve
 
-MySQL contient notamment :
-
-- `news_articles` : articles dédupliqués et enrichis ;
-- `analytics_hourly` : volumes et sentiments par heure ;
-- `pipeline_hourly` : débit et latence du pipeline.
-
-### Graphiques Grafana
-
-- volume d’articles par thème et dans le temps ;
-- sentiment moyen et distribution des sentiments ;
-- derniers articles analysés ;
-- débit d’ingestion par source ;
-- latence moyenne par source.
-
-## ▶️ Démarrage
+Prérequis : Git, Docker avec Compose v2 et Python 3.11+ pour générer la configuration
+(les conteneurs et la CI utilisent Python 3.12).
 
 ```bash
-# Cloner le projet
 git clone https://github.com/Immooo/CriptoVizz.git
 cd CriptoVizz
-
-# Créer la configuration locale
-cp .env.example .env
-
-# Construire et lancer tous les services
-docker compose up --build
+python script/setup-env.py
+docker compose config --quiet
+docker compose up -d --build --wait
 ```
 
-Accès :
+Le générateur crée `.env` avec des secrets aléatoires et refuse d’écraser un fichier
+existant. **Ne pas copier simplement `.env.example` : les secrets requis sont vides.**
+Les volumes existants demandent la procédure de [mise à niveau](docs/OPERATIONS.md).
 
-- Grafana : <http://localhost:3000>
-- Interface RabbitMQ : <http://localhost:15672>
+| Accès local | Connexion |
+| --- | --- |
+| [Grafana](http://localhost:3000) | `admin` / valeur de `GRAFANA_ADMIN_PASSWORD` dans `.env` |
+| [RabbitMQ](http://localhost:15672) | valeur de `RABBITMQ_USER` / `RABBITMQ_PASSWORD` |
+| MySQL, port 3306 | compte applicatif défini dans `.env` |
 
-Pour démontrer le scaling horizontal du traitement Analytics :
+Les ports publiés écoutent uniquement sur `127.0.0.1`. Le dashboard apparaît dans
+Grafana grâce au provisioning de `grafana/` ; sélectionner une période avec des données.
+Le chargement dépend de la disponibilité des flux externes.
+
+## Configuration
+
+| Variable | Valeur / contrainte |
+| --- | --- |
+| `NEWS_FEED_URLS` | URL HTTP(S) séparées par des virgules, sources de confiance uniquement. |
+| `SCRAPE_INTERVAL_SECONDS` | `60`, entier strictement positif. |
+| `RAW_NEWS_QUEUE`, `ANALYTICS_QUEUE` | `raw_news`, `enriched_news`. |
+| `DEAD_LETTER_EXCHANGE` | `dead_letter`. |
+| `ANALYTICS_PREFETCH_COUNT`, `STORAGE_PREFETCH_COUNT` | `50`, entier strictement positif. |
+| `RETENTION_DAYS` | `30`, entier strictement positif. |
+| `MYSQL_DATABASE`, `MYSQL_USER` | `crypto` par défaut. Nom de base alphanumérique ou `_`. |
+| `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD` | Secrets générés, distincts. |
+| `GRAFANA_ADMIN_PASSWORD` | Secret initial ; sa modification ne réinitialise pas un compte existant. |
+| `GRAFANA_DB_PASSWORD` | Secret hexadécimal pour le compte `grafana_reader`. |
+| `RABBITMQ_USER`, `RABBITMQ_PASSWORD` | Compte dédié, créé lors de la première initialisation. |
+| `RABBITMQ_URL` | Optionnel : remplace la connexion au broker interne. Ne jamais versionner cette URL avec ses secrets. |
+
+## Développement et vérification
 
 ```bash
-docker compose up --build --scale analytics=3
+python -m venv .venv
+# Linux/macOS : source .venv/bin/activate
+# PowerShell : .venv/Scripts/Activate.ps1
+python -m pip install -r requirements-dev.txt
+# Linux/macOS : export PYTHONPATH=app
+# PowerShell : $env:PYTHONPATH='app'
+python -m unittest discover -s tests -v
+ruff check app tests script
+ruff format --check app tests script
+bandit -r app -ll
+pip-audit -r app/scrap/requirements.txt -r app/analytics/requirements.txt -r app/queue/requirements.txt -r app/clean/requirements.txt
 ```
 
-RabbitMQ répartit les messages de `raw_news` entre les trois consommateurs.
-La limite de prefetch empêche une seule instance de réserver tout le backlog.
+Sur une pile de test démarrée :
 
-## 🧩 Services
+```bash
+# Linux/macOS
+docker compose exec -T queue python - < tests/integration_pipeline.py
+# PowerShell
+Get-Content -Raw tests/integration_pipeline.py | docker compose exec -T queue python -
+```
 
-### Scraper
+Le test crée puis retire ses données synthétiques. Il vérifie la déduplication,
+les agrégats et le routage des messages invalides vers les deux DLQ. Préférer une
+pile isolée : le test peut temporairement réserver des messages préexistants en DLQ.
+La CI GitHub exécute formatage, lint, tests, audit des dépendances et intégration Docker.
+Dependabot propose les mises à jour Python, Dockerfiles et GitHub Actions ; les
+versions des services dans Compose doivent aussi être revues régulièrement.
 
-- Lit les URL définies dans `NEWS_FEED_URLS`.
-- Normalise les articles et leur attribue un identifiant déterministe avant publication.
-- Recommence selon `SCRAPE_INTERVAL_SECONDS`.
+## Exploitation
 
-### Queues
+```bash
+docker compose ps
+docker compose logs --tail 100 -f analytics queue
+docker compose up -d --scale analytics=3
+docker compose stop
+```
 
-- `raw_news` transporte les articles bruts.
-- `enriched_news` transporte les événements enrichis.
-- Les `.dlq` conservent les messages invalides pour diagnostic et rejeu contrôlé.
-- Un message n’est acquitté qu’après traitement réussi.
+Ne pas utiliser `docker compose down -v` sur une pile à conserver : cela supprime ses
+volumes. Les procédures de sauvegarde, migration et récupération Grafana sont dans
+[OPERATIONS.md](docs/OPERATIONS.md).
 
-### Traitement et analyse
+## Sécurité et limites
 
-- Consomme les articles bruts et publie les événements enrichis.
-- Calcule sentiment, thèmes et indicateurs horaires en continu.
-- Persiste les articles et agrégats dans MySQL.
+Le projet cible une machine locale de confiance, pas une exposition Internet directe.
+Les workers tournent sans root, avec système de fichiers en lecture seule et sans
+capabilities Linux. Les secrets sont exclus de Git et du contexte de construction.
+Les messages sont bornés et validés ; les requêtes SQL utilisent des paramètres.
 
-### Nettoyage
+Une production exige TLS, gestion centralisée des secrets, comptes SQL séparés pour
+écriture/nettoyage/migrations, sauvegardes restaurées régulièrement, quotas des files,
+alertes de backlog/DLQ et haute disponibilité. Les volumes et communications internes
+ne sont pas chiffrés par cette configuration. Le compte Docker de l’hôte reste privilégié.
 
-Le service `clean` supprime les articles bruts plus anciens que
-`RETENTION_DAYS`, tout en conservant les agrégats horaires.
-
-### Visualisation
-
-Grafana utilise une datasource MySQL et un dashboard provisionnés depuis Git.
-
-### Dockerisation
-
-Docker Compose isole les services, réseaux, variables d’environnement et volumes.
-Le service Analytics peut être répliqué avec `--scale` pour tester la distribution
-du travail.
-
+Voir [l’audit et ses limites](docs/SECURITY_REVIEW.md), le
+[rapport d’architecture](docs/RAPPORT_ARCHITECTURE.md) et la
+[politique de sécurité](SECURITY.md).

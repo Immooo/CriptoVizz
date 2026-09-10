@@ -1,16 +1,9 @@
 import sys
-import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-
 sys.path.insert(0, str(Path(__file__).parents[1] / "app" / "scrap"))
-if "feedparser" not in sys.modules:
-    fake_feedparser = types.ModuleType("feedparser")
-    fake_feedparser.parse = lambda url: None
-    sys.modules["feedparser"] = fake_feedparser
-
 from cryptoscrap import CryptoNewsScraper  # noqa: E402
 
 
@@ -19,7 +12,7 @@ class Feed(dict):
 
 
 class ScraperTests(unittest.TestCase):
-    @patch("cryptoscrap.feedparser.parse")
+    @patch.object(CryptoNewsScraper, "_fetch")
     def test_normalizes_feed_entry(self, parse):
         parse.return_value = Feed(
             bozo=False,
@@ -44,3 +37,32 @@ class ScraperTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FetchTests(unittest.TestCase):
+    @patch("cryptoscrap._OPENER.open")
+    def test_rejects_oversized_feed(self, open_url):
+        open_url.return_value.__enter__.return_value.read.return_value = b"x" * (
+            2 * 1024 * 1024 + 1
+        )
+        with self.assertRaises(ValueError):
+            CryptoNewsScraper._fetch("https://example.test/rss")
+        self.assertEqual(open_url.call_args.kwargs["timeout"], 15)
+
+    @patch("cryptoscrap._OPENER.open")
+    def test_rejects_local_file(self, open_url):
+        with self.assertRaises(ValueError):
+            CryptoNewsScraper._fetch("file:///etc/passwd")
+        open_url.assert_not_called()
+
+    @patch.object(CryptoNewsScraper, "_fetch", side_effect=TimeoutError)
+    def test_timeout_skips_source(self, fetch):
+        self.assertEqual(CryptoNewsScraper(["https://example.test/rss"]).collect(), [])
+
+
+class RedirectTests(unittest.TestCase):
+    def test_rejects_ftp_redirect(self):
+        from cryptoscrap import HTTPOnlyRedirects
+
+        with self.assertRaises(ValueError):
+            HTTPOnlyRedirects().redirect_request(None, None, 302, "", {}, "ftp://example.test/file")

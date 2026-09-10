@@ -3,32 +3,22 @@ import os
 import time
 
 import pika
-
+from common.broker import declare_queue_with_dlq, parameters
+from common.config import positive_int
 from cryptoscrap import CryptoNewsScraper
-
 
 RAW_QUEUE = os.getenv("RAW_NEWS_QUEUE", "raw_news")
 DEAD_LETTER_EXCHANGE = os.getenv("DEAD_LETTER_EXCHANGE", "dead_letter")
-POLL_INTERVAL_SECONDS = int(os.getenv("SCRAPE_INTERVAL_SECONDS", "60"))
+POLL_INTERVAL_SECONDS = positive_int("SCRAPE_INTERVAL_SECONDS", 60)
 
 
 def connect():
-    params = pika.URLParameters(
-        os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672")
-    )
+    params = parameters()
     while True:
         try:
             connection = pika.BlockingConnection(params)
             channel = connection.channel()
-            dead_letter_queue = f"{RAW_QUEUE}.dlq"
-            channel.exchange_declare(exchange=DEAD_LETTER_EXCHANGE, exchange_type="direct", durable=True)
-            channel.queue_declare(queue=dead_letter_queue, durable=True)
-            channel.queue_bind(exchange=DEAD_LETTER_EXCHANGE, queue=dead_letter_queue, routing_key=RAW_QUEUE)
-            channel.queue_declare(
-                queue=RAW_QUEUE,
-                durable=True,
-                arguments={"x-dead-letter-exchange": DEAD_LETTER_EXCHANGE},
-            )
+            declare_queue_with_dlq(channel, RAW_QUEUE)
             channel.confirm_delivery()
             return connection, channel
         except pika.exceptions.AMQPConnectionError as exc:
@@ -38,6 +28,7 @@ def connect():
 
 def publish(channel, article):
     channel.basic_publish(
+        mandatory=True,
         exchange="",
         routing_key=RAW_QUEUE,
         body=json.dumps(article).encode("utf-8"),
@@ -64,8 +55,10 @@ if __name__ == "__main__":
                 print(f"Published {len(articles)} news articles to {RAW_QUEUE}")
             except (pika.exceptions.AMQPError, OSError) as exc:
                 print(f"Collection cycle failed: {exc}")
+                if connection.is_open:
+                    connection.close()
                 connection, channel = connect()
-            time.sleep(POLL_INTERVAL_SECONDS)
+            connection.sleep(POLL_INTERVAL_SECONDS)
     except KeyboardInterrupt:
         pass
     finally:

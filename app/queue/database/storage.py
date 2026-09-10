@@ -1,71 +1,18 @@
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
+import common
 import mysql.connector
 import pika
+from common.broker import declare_queue_with_dlq, parameters
+from common.config import positive_int
+from common.messages import MAX_MESSAGE_BYTES, validate_article
 
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS news_articles (
-    article_id CHAR(64) PRIMARY KEY,
-    source VARCHAR(120) NOT NULL,
-    title VARCHAR(500) NOT NULL,
-    summary TEXT,
-    url VARCHAR(1000) NOT NULL,
-    published_at DATETIME NOT NULL,
-    collected_at DATETIME NOT NULL,
-    sentiment_score DECIMAL(6,4) NOT NULL,
-    sentiment_label ENUM('positive', 'neutral', 'negative') NOT NULL,
-    topics JSON NOT NULL,
-    INDEX idx_news_published (published_at),
-    INDEX idx_news_source (source)
-);
-CREATE TABLE IF NOT EXISTS analytics_hourly (
-    bucket_start DATETIME NOT NULL,
-    source VARCHAR(120) NOT NULL,
-    topic VARCHAR(80) NOT NULL,
-    article_count INT NOT NULL DEFAULT 0,
-    positive_count INT NOT NULL DEFAULT 0,
-    neutral_count INT NOT NULL DEFAULT 0,
-    negative_count INT NOT NULL DEFAULT 0,
-    sentiment_sum DECIMAL(12,4) NOT NULL DEFAULT 0,
-    PRIMARY KEY (bucket_start, source, topic),
-    INDEX idx_analytics_bucket (bucket_start)
-);
-CREATE TABLE IF NOT EXISTS pipeline_hourly (
-    bucket_start DATETIME NOT NULL,
-    source VARCHAR(120) NOT NULL,
-    article_count INT NOT NULL DEFAULT 0,
-    latency_sum_ms BIGINT NOT NULL DEFAULT 0,
-    latency_max_ms BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (bucket_start, source),
-    INDEX idx_pipeline_bucket (bucket_start)
-);
-"""
+SCHEMA = (Path(common.__file__).with_name("schema.sql")).read_text(encoding="utf-8")
 DEAD_LETTER_EXCHANGE = os.getenv("DEAD_LETTER_EXCHANGE", "dead_letter")
-
-
-def declare_queue_with_dlq(channel, queue_name):
-    """Declare a durable work queue and route rejected messages to a DLQ."""
-    dead_letter_queue = f"{queue_name}.dlq"
-    channel.exchange_declare(
-        exchange=DEAD_LETTER_EXCHANGE,
-        exchange_type="direct",
-        durable=True,
-    )
-    channel.queue_declare(queue=dead_letter_queue, durable=True)
-    channel.queue_bind(
-        exchange=DEAD_LETTER_EXCHANGE,
-        queue=dead_letter_queue,
-        routing_key=queue_name,
-    )
-    channel.queue_declare(
-        queue=queue_name,
-        durable=True,
-        arguments={"x-dead-letter-exchange": DEAD_LETTER_EXCHANGE},
-    )
 
 
 def utc_naive(value):
@@ -78,10 +25,7 @@ def utc_naive(value):
 class StorageConsumer:
     def __init__(self):
         self.queue = os.getenv("ANALYTICS_QUEUE", "enriched_news")
-        self.rabbitmq_url = os.getenv(
-            "RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672"
-        )
-        self.prefetch_count = int(os.getenv("STORAGE_PREFETCH_COUNT", "50"))
+        self.prefetch_count = positive_int("STORAGE_PREFETCH_COUNT", 50)
 
     @staticmethod
     def connect_db():
@@ -89,7 +33,8 @@ class StorageConsumer:
             host=os.getenv("MYSQL_HOST", "mysql"),
             port=int(os.getenv("MYSQL_PORT", "3306")),
             user=os.getenv("MYSQL_USER", "crypto"),
-            password=os.getenv("MYSQL_PASSWORD", "crypto"),
+            password=os.environ["MYSQL_PASSWORD"],
+            connection_timeout=10,
             database=os.getenv("MYSQL_DATABASE", "crypto"),
         )
 
@@ -108,7 +53,15 @@ class StorageConsumer:
                 time.sleep(5)
 
     def store(self, article):
+        validate_article(article, enriched=True)
         published_at = utc_naive(article["published_at"])
+        retention_days = positive_int("RETENTION_DAYS", 30)
+        if retention_days <= 0:
+            raise ValueError("RETENTION_DAYS must be positive")
+        if published_at < datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+            days=retention_days
+        ):
+            return False
         collected_at = utc_naive(article["collected_at"])
         analytics_bucket = published_at.replace(minute=0, second=0, microsecond=0)
         pipeline_bucket = collected_at.replace(minute=0, second=0, microsecond=0)
@@ -120,16 +73,23 @@ class StorageConsumer:
             with database.cursor() as cursor:
                 cursor.execute(
                     """
-                    INSERT IGNORE INTO news_articles
+                    INSERT INTO news_articles
                     (article_id, source, title, summary, url, published_at,
                      collected_at, sentiment_score, sentiment_label, topics)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE article_id = article_id
                     """,
                     (
-                        article["article_id"], article["source"], article["title"],
-                        article.get("summary", ""), article["url"], published_at,
-                        collected_at, article["sentiment_score"],
-                        article["sentiment_label"], json.dumps(topics),
+                        article["article_id"],
+                        article["source"],
+                        article["title"],
+                        article.get("summary", ""),
+                        article["url"],
+                        published_at,
+                        collected_at,
+                        article["sentiment_score"],
+                        article["sentiment_label"],
+                        json.dumps(topics),
                     ),
                 )
                 if cursor.rowcount == 0:
@@ -164,9 +124,13 @@ class StorageConsumer:
                             sentiment_sum = sentiment_sum + VALUES(sentiment_sum)
                         """,
                         (
-                            analytics_bucket, article["source"], topic,
-                            int(label == "positive"), int(label == "neutral"),
-                            int(label == "negative"), article["sentiment_score"],
+                            analytics_bucket,
+                            article["source"],
+                            topic,
+                            int(label == "positive"),
+                            int(label == "neutral"),
+                            int(label == "negative"),
+                            article["sentiment_score"],
                         ),
                     )
             database.commit()
@@ -175,28 +139,36 @@ class StorageConsumer:
     def run(self):
         self.ensure_schema()
         while True:
+            connection = None
             try:
-                connection = pika.BlockingConnection(
-                    pika.URLParameters(self.rabbitmq_url)
-                )
+                connection = pika.BlockingConnection(parameters())
                 channel = connection.channel()
                 declare_queue_with_dlq(channel, self.queue)
                 channel.basic_qos(prefetch_count=self.prefetch_count)
 
                 def callback(ch, method, properties, body):
                     try:
+                        if len(body) > MAX_MESSAGE_BYTES:
+                            raise ValueError("message too large")
                         self.store(json.loads(body))
                         ch.basic_ack(method.delivery_tag)
                     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                         print(f"Invalid analytics message discarded: {exc}")
                         ch.basic_reject(method.delivery_tag, requeue=False)
-                    except Exception as exc:
+                    except (mysql.connector.DataError, mysql.connector.IntegrityError) as exc:
+                        print(f"Invalid database payload: {exc}")
+                        ch.basic_reject(method.delivery_tag, requeue=False)
+                    except mysql.connector.Error as exc:
                         print(f"Storage failed, message requeued: {exc}")
                         ch.basic_nack(method.delivery_tag, requeue=True)
+                        connection.sleep(5)
 
                 channel.basic_consume(self.queue, callback, auto_ack=False)
                 print(f"Storage consumer listening on {self.queue}")
                 channel.start_consuming()
-            except pika.exceptions.AMQPConnectionError as exc:
+            except pika.exceptions.AMQPError as exc:
                 print(f"RabbitMQ unavailable: {exc}; retrying in 5 seconds")
                 time.sleep(5)
+            finally:
+                if connection is not None and connection.is_open:
+                    connection.close()

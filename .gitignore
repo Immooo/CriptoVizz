@@ -14,3 +14,9 @@ output/presentation/*
 venv/
 .DS_Store
 volumes/
+
+# Local backups and audit tools
+*.sql.gz
+cryptoviz-backup.sql
+grafana-backup/
+.ruff_cache/

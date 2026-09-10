@@ -1,5 +1,6 @@
-import mysql.connector
 import os
+
+import mysql.connector
 
 
 class Database_connection:
@@ -10,7 +11,8 @@ class Database_connection:
         return mysql.connector.connect(
             host=os.getenv("MYSQL_HOST", "mysql"),
             user=os.getenv("MYSQL_USER", "crypto"),
-            password=os.getenv("MYSQL_PASSWORD", "crypto"),
+            password=os.environ["MYSQL_PASSWORD"],
+            connection_timeout=10,
             database=os.getenv("MYSQL_DATABASE", "crypto"),
             port=int(os.getenv("MYSQL_PORT", "3306")),
         )

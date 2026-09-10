@@ -1,50 +1,81 @@
+x-logging: &id001
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
 services:
-  ### MySQL Container
   mysql:
+    logging: *id001
     container_name: mysql
     image: mysql:8.4
     ports:
-      - 3306:3306
+    - 127.0.0.1:3306:3306
     volumes:
-      - mysql-data:/var/lib/mysql
-      - ./script/createTableCrypto.sql:/docker-entrypoint-initdb.d/createTableCrypto.sql
+    - mysql-data:/var/lib/mysql
+    - ./script/init-grafana-user.sh:/docker-entrypoint-initdb.d/02-grafana.sh:ro
+    - ./script/createTableCrypto.sql:/docker-entrypoint-initdb.d/createTableCrypto.sql
     networks:
-      - mysql_go_net
+    - mysql_go_net
     environment:
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    - GRAFANA_DB_PASSWORD=${GRAFANA_DB_PASSWORD:?set GRAFANA_DB_PASSWORD in .env}
+    - MYSQL_DATABASE=${MYSQL_DATABASE}
+    - MYSQL_USER=${MYSQL_USER}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+    - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test:
+      - CMD-SHELL
+      - MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping -h localhost -uroot --silent
       timeout: 20s
       retries: 10
       interval: 10s
       start_period: 40s
-
-  ### Python Container (Scrap)
   scrap:
-    build: ./app/scrap
+    logging: *id001
+    build:
+      context: .
+      dockerfile: app/scrap/Dockerfile
+    init: true
+    read_only: true
+    tmpfs:
+    - /tmp
+    cap_drop:
+    - ALL
+    security_opt:
+    - no-new-privileges:true
     container_name: scrap
     restart: always
     environment:
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
+      RABBITMQ_URL: ${RABBITMQ_URL:-}
+      RABBITMQ_USER: ${RABBITMQ_USER:-cryptoviz}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
       RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news}
       DEAD_LETTER_EXCHANGE: ${DEAD_LETTER_EXCHANGE:-dead_letter}
       NEWS_FEED_URLS: ${NEWS_FEED_URLS:-https://www.coindesk.com/arc/outboundfeeds/rss/,https://cointelegraph.com/rss}
       SCRAPE_INTERVAL_SECONDS: ${SCRAPE_INTERVAL_SECONDS:-60}
     networks:
-      - rabbitmq_go_net
+    - rabbitmq_go_net
     depends_on:
       rabbitmq:
         condition: service_healthy
-
-  ### Online Analytics Builder (consumer and producer)
   analytics:
-    build: ./app/analytics
+    logging: *id001
+    build:
+      context: .
+      dockerfile: app/analytics/Dockerfile
+    init: true
+    read_only: true
+    tmpfs:
+    - /tmp
+    cap_drop:
+    - ALL
+    security_opt:
+    - no-new-privileges:true
     restart: always
     environment:
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
+      RABBITMQ_URL: ${RABBITMQ_URL:-}
+      RABBITMQ_USER: ${RABBITMQ_USER:-cryptoviz}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
       RAW_NEWS_QUEUE: ${RAW_NEWS_QUEUE:-raw_news}
       ANALYTICS_QUEUE: ${ANALYTICS_QUEUE:-enriched_news}
       ANALYTICS_PREFETCH_COUNT: ${ANALYTICS_PREFETCH_COUNT:-50}
@@ -55,37 +86,58 @@ services:
       scrap:
         condition: service_started
     networks:
-      - rabbitmq_go_net
-
-  ### Analytics storage consumer
+    - rabbitmq_go_net
   queue:
-    build: ./app/queue
+    logging: *id001
+    build:
+      context: .
+      dockerfile: app/queue/Dockerfile
+    init: true
+    read_only: true
+    tmpfs:
+    - /tmp
+    cap_drop:
+    - ALL
+    security_opt:
+    - no-new-privileges:true
     container_name: queue
     restart: always
     environment:
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
+      RABBITMQ_URL: ${RABBITMQ_URL:-}
+      RABBITMQ_USER: ${RABBITMQ_USER:-cryptoviz}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
       ANALYTICS_QUEUE: ${ANALYTICS_QUEUE:-enriched_news}
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
       STORAGE_PREFETCH_COUNT: ${STORAGE_PREFETCH_COUNT:-50}
       DEAD_LETTER_EXCHANGE: ${DEAD_LETTER_EXCHANGE:-dead_letter}
     depends_on:
       mysql:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
       analytics:
         condition: service_started
     networks:
-      - rabbitmq_go_net
-      - mysql_go_net
-
-  ### Python Container (Clean)
+    - rabbitmq_go_net
+    - mysql_go_net
   clean:
-    build: ./app/clean
+    logging: *id001
+    build:
+      context: .
+      dockerfile: app/clean/Dockerfile
+    init: true
+    read_only: true
+    tmpfs:
+    - /tmp
+    cap_drop:
+    - ALL
+    security_opt:
+    - no-new-privileges:true
     container_name: clean
     restart: always
     environment:
@@ -93,58 +145,65 @@ services:
       MYSQL_PORT: 3306
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
       RETENTION_DAYS: ${RETENTION_DAYS:-30}
     depends_on:
       mysql:
         condition: service_healthy
     networks:
-      - mysql_go_net
-
-  ### Grafana Container
+    - mysql_go_net
   grafana:
-      image: grafana/grafana:12.1.0
-      container_name: grafana
-      ports:
-        - 3000:3000
-      restart: unless-stopped
-      volumes:
-        - grafana-data:/var/lib/grafana
-        - ./grafana/provisioning:/etc/grafana/provisioning:ro
-        - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-      depends_on:
-        mysql:
-          condition: service_healthy
-      networks:
-        - mysql_go_net  # AJOUT DU RÉSEAU MYSQL
-      environment:
-        - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
-        - MYSQL_DATABASE=${MYSQL_DATABASE}
-        - MYSQL_USER=${MYSQL_USER}
-        - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-
+    logging: *id001
+    image: grafana/grafana:13.2.1
+    container_name: grafana
+    ports:
+    - 127.0.0.1:3000:3000
+    restart: unless-stopped
+    volumes:
+    - grafana-data:/var/lib/grafana
+    - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+    - mysql_go_net
+    environment:
+    - GF_USERS_ALLOW_SIGN_UP=false
+    - GF_AUTH_ANONYMOUS_ENABLED=false
+    - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD
+      in .env}
+    - MYSQL_DATABASE=${MYSQL_DATABASE}
+    - MYSQL_USER=grafana_reader
+    - MYSQL_PASSWORD=${GRAFANA_DB_PASSWORD:?set GRAFANA_DB_PASSWORD in .env}
   rabbitmq:
     image: rabbitmq:4.1-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-cryptoviz}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
     container_name: rabbitmq
     ports:
-      - 5672:5672
-      - 15672:15672
+    - 127.0.0.1:5672:5672
+    - 127.0.0.1:15672:15672
     volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
+    - rabbitmq-data:/var/lib/rabbitmq
     networks:
-      - rabbitmq_go_net
+    - rabbitmq_go_net
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test:
+      - CMD
+      - rabbitmq-diagnostics
+      - -q
+      - ping
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 30s
-
+    logging: *id001
 volumes:
-  mysql-data:
-  grafana-data:
-  rabbitmq-data:
-
+  mysql-data: null
+  grafana-data: null
+  rabbitmq-data: null
 networks:
   rabbitmq_go_net:
     driver: bridge

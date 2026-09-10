@@ -87,7 +87,7 @@ Storage consomme les messages enrichis et effectue, dans une même transaction :
 - la mise à jour des agrégats de contenu dans `analytics_hourly` ;
 - la mise à jour des mesures du pipeline dans `pipeline_hourly`.
 
-La clé primaire `article_id` et `INSERT IGNORE` rendent l'écriture idempotente :
+La clé primaire `article_id` et `INSERT ... ON DUPLICATE KEY UPDATE` rendent l'écriture idempotente :
 une redelivery d'un article déjà présent ne modifie pas une seconde fois les
 agrégats. Les tendances de contenu sont regroupées selon `published_at`. Les
 mesures d'ingestion sont regroupées selon `collected_at`, afin qu'un article ancien
@@ -217,3 +217,13 @@ visualisation. Son architecture respecte le paradigme producteur/consommateur et
 intègre plusieurs mécanismes de fiabilité utiles. Le projet doit être présenté
 comme un prototype de pipeline de données en continu : il démontre une architecture
 extensible, tout en assumant un volume local et une analyse lexicale limités.
+
+
+## Mise à jour de sécurité et d’exploitation (septembre 2026)
+
+Le durcissement, les preuves de test et les limites actuelles sont détaillés dans
+[SECURITY_REVIEW.md](SECURITY_REVIEW.md). Le README décrit la configuration courante.
+Grafana utilise désormais un compte MySQL de lecture seule ; les workers partagent
+un contrat d’événement validé et la topologie RabbitMQ. Les événements déjà hors
+rétention sont ignorés afin de ne pas recompter des articles purgés.
+Les installations antérieures demandent la [migration des comptes](OPERATIONS.md).

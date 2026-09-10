@@ -1,14 +1,40 @@
 import re
 from collections import Counter
 
-
 POSITIVE_WORDS = {
-    "adoption", "approval", "approved", "bull", "bullish", "gain", "gains",
-    "growth", "high", "launch", "profit", "rally", "record", "rise", "surge",
+    "adoption",
+    "approval",
+    "approved",
+    "bull",
+    "bullish",
+    "gain",
+    "gains",
+    "growth",
+    "high",
+    "launch",
+    "profit",
+    "rally",
+    "record",
+    "rise",
+    "surge",
 }
 NEGATIVE_WORDS = {
-    "attack", "ban", "bear", "bearish", "crash", "crime", "decline", "drop",
-    "fraud", "hack", "loss", "lawsuit", "risk", "scam", "selloff", "warning",
+    "attack",
+    "ban",
+    "bear",
+    "bearish",
+    "crash",
+    "crime",
+    "decline",
+    "drop",
+    "fraud",
+    "hack",
+    "loss",
+    "lawsuit",
+    "risk",
+    "scam",
+    "selloff",
+    "warning",
 }
 TOPICS = {
     "bitcoin": {"bitcoin", "btc"},
@@ -32,9 +58,7 @@ def analyze_article(article):
     score = max(-1.0, min(1.0, (positive - negative) / max(positive + negative, 1)))
     label = "positive" if score > 0 else "negative" if score < 0 else "neutral"
 
-    topics = [
-        topic for topic, keywords in TOPICS.items() if any(counts[word] for word in keywords)
-    ]
+    topics = [topic for topic, keywords in TOPICS.items() if any(counts[word] for word in keywords)]
 
     return {
         **article,
