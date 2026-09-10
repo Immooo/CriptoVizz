@@ -92,8 +92,6 @@ python -m venv .venv
 # Linux/macOS : source .venv/bin/activate
 # PowerShell : .venv/Scripts/Activate.ps1
 python -m pip install -r requirements-dev.txt
-# Linux/macOS : export PYTHONPATH=app
-# PowerShell : $env:PYTHONPATH='app'
 python -m unittest discover -s tests -v
 ruff check app tests script
 ruff format --check app tests script

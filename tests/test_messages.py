@@ -1,10 +1,15 @@
 import copy
+import sys
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import patch
 
-from app.common.messages import validate_article
-from app.queue.database.storage import StorageConsumer
+# Append after the standard library: app/queue must never shadow stdlib queue.
+sys.path.append(str(Path(__file__).resolve().parents[1] / "app"))
+
+from app.common.messages import validate_article  # noqa: E402
+from app.queue.database.storage import StorageConsumer  # noqa: E402
 
 
 def valid_article():
