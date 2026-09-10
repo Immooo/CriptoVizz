@@ -352,7 +352,7 @@ Objectif : réponse de 30 à 60 secondes avec application au projet.
 | 22 | Que se passe-t-il si Analytics crash avant l'ACK ? | Redelivery probable | 🟠 |
 | 23 | Que se passe-t-il après publication enrichie mais avant ACK brut ? | Doublon possible en aval | 🟠 |
 | 24 | Pourquoi viser une livraison au moins une fois ? | Fiabilité avec redelivery possible | 🟡 |
-| 25 | Comment absorber les doublons ? | ID déterministe, PK, `INSERT IGNORE`, transaction | 🟠 |
+| 25 | Comment absorber les doublons ? | ID déterministe, PK, `INSERT ... ON DUPLICATE KEY UPDATE`, transaction | 🟠 |
 | 26 | Qu'est-ce que l'idempotence ? | Même opération répétée, même état final | 🟠 |
 | 27 | À quoi sert `prefetch_count=50` ? | Messages non acquittés max par consumer | 🔴 |
 | 28 | Qu'est-ce que la back-pressure ? | Adapter/limiter la charge quand aval plus lent | 🔴 |
@@ -382,7 +382,7 @@ Objectif : réponse de 30 à 60 secondes avec application au projet.
 
 > L'ACK peut être perdu après l'écriture MySQL, donc RabbitMQ peut redélivrer le
 > message. L'identifiant de l'article est déterministe, basé sur son URL. La clé
-> primaire et `INSERT IGNORE` empêchent une seconde insertion ; les agrégats ne sont
+> primaire et `INSERT ... ON DUPLICATE KEY UPDATE` empêchent une seconde insertion ; les agrégats ne sont
 > mis à jour que lorsqu'un nouvel article a réellement été inséré.
 
 **Prefetch et scaling**
@@ -539,7 +539,7 @@ habitude orale à corriger. Refaire uniquement les trois passages faibles.
 | Pitch et valeur | 1.5 | 2.2 | 2.5 | Ajouter RabbitMQ et MySQL sans allonger le pitch |
 | Architecture | 2.0 | 2.1 | 3.0 | Parcours fluide avec queues v3 et messages JSON |
 | RabbitMQ | 2.3 | 1.9 | 3.0 | DLQ, back-pressure, prefetch et publication avant ACK |
-| MySQL/idempotence | 1.5 | 1.8 | 2.5 | Citer SHA-256, PK, `INSERT IGNORE` et condition sur les agrégats |
+| MySQL/idempotence | 1.5 | 1.8 | 2.5 | Citer SHA-256, PK, `INSERT ... ON DUPLICATE KEY UPDATE` et condition sur les agrégats |
 | Analytics | 1.8 | 2.5 | 2.5 | Confirmer par rappel différé la méthode et ses limites |
 | Big Data | 1.5 | 2.3 | 2.5 | Conserver la réponse honnête et mesurer avant de nommer un goulot |
 | Scalabilité | 1.5 | 2.0 | 2.5 | Distinguer prefetch, débit et ajout de replicas |

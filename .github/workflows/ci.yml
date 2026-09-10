@@ -1,0 +1,34 @@
+name: Quality and security
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check app tests script
+      - run: ruff format --check app tests script
+      - run: bandit -r app -ll
+      - run: python -m unittest discover -s tests -v
+      - run: pip-audit -r app/scrap/requirements.txt -r app/analytics/requirements.txt -r app/queue/requirements.txt -r app/clean/requirements.txt
+      - run: python script/setup-env.py
+      - run: docker compose config --quiet
+      - run: docker compose up -d --build --wait --wait-timeout 180
+      - run: docker compose exec -T queue python - < tests/integration_pipeline.py
+      - if: always()
+        run: docker compose logs --tail 50
+      - if: always()
+        run: docker compose down --volumes

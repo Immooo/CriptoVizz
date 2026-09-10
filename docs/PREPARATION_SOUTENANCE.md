@@ -62,7 +62,7 @@ Grafana
 4. **ACK** : confirmation envoyée après réussite. Avant l'ACK, un crash peut provoquer
    une nouvelle livraison. Le système vise donc une livraison au moins une fois.
 5. **Idempotence et déduplication** : SHA-256 de l'URL comme `article_id`, clé primaire
-   et `INSERT IGNORE`. Rejouer un article ne crée pas une seconde ligne ni un second agrégat.
+   et `INSERT ... ON DUPLICATE KEY UPDATE`. Rejouer un article ne crée pas une seconde ligne ni un second agrégat.
 6. **Analytics Builder** : score lexical entre -1 et 1, label de sentiment et thèmes.
    Méthode rapide et explicable, mais limitée face au sarcasme et au contexte.
 7. **Agrégations temporelles** : compteurs horaires mis à jour lors de chaque nouvel
@@ -253,7 +253,7 @@ Réponses pivots, 20 à 40 secondes :
   tâches, d'ACK et de files simples. Kafka serait préférable pour un journal durable,
   rejouable, distribué et à très haut débit. Pour deux RSS, Kafka alourdirait la démo.
 - **Crash après INSERT avant ACK** : RabbitMQ peut redélivrer le message. La clé
-  primaire et `INSERT IGNORE` rendent le stockage idempotent, donc les agrégats ne
+  primaire et `INSERT ... ON DUPLICATE KEY UPDATE` rendent le stockage idempotent, donc les agrégats ne
   sont pas incrémentés deux fois.
 - **Projet Big Data** : le dataset de démonstration reste petit. L'orientation Big
   Data vient de l'ingestion continue, du découplage, de la gestion de pression, du
@@ -345,7 +345,7 @@ confirmer par rappel différé le 10 septembre.
 1. DLQ et distinction erreur temporaire/permanente.
 2. `prefetch_count=50`, back-pressure et absence de gain automatique de throughput.
 3. Publication dans `enriched_news` puis crash avant ACK : redelivery et doublon possible.
-4. Idempotence : SHA-256 de l'URL, clé primaire, `INSERT IGNORE` et agrégats conditionnels.
+4. Idempotence : SHA-256 de l'URL, clé primaire, `INSERT ... ON DUPLICATE KEY UPDATE` et agrégats conditionnels.
 5. Throughput, latency entre `collected_at` et stockage, backlog et recherche du vrai goulot.
 6. SPOF : RabbitMQ mono-nœud, MySQL mono-nœud et machine Docker locale.
 7. Panne MySQL : échec d'écriture, absence d'ACK, NACK/requeue, reconnexion et backlog.

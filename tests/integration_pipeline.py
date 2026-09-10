@@ -1,6 +1,6 @@
 """Live integration checks for idempotent storage and both dead-letter queues.
 
-Run inside the Storage container after copying the file to /tmp. The script creates
+Run through standard input inside the Storage container. The script creates
 and removes one synthetic database row. It also sends one invalid message through
 each application queue, verifies the matching DLQ, then removes only its own test
 messages from those DLQs.
@@ -16,10 +16,9 @@ from datetime import datetime, timezone
 import mysql.connector
 import pika
 
-
 sys.path.insert(0, "/app")
+from common.broker import parameters
 from database.storage import StorageConsumer  # noqa: E402
-
 
 DEAD_LETTER_EXCHANGE = os.getenv("DEAD_LETTER_EXCHANGE", "dead_letter")
 RAW_QUEUE = os.getenv("RAW_NEWS_QUEUE", "raw_news")
@@ -118,25 +117,23 @@ def declare_queue(channel, queue_name):
 
 
 def remove_test_message(channel, dlq, message_id):
+    # Hold unrelated deliveries unacked and requeue them without republishing.
     preserved = []
     found = False
-    while True:
-        method, properties, body = channel.basic_get(queue=dlq, auto_ack=False)
-        if method is None:
-            break
-        channel.basic_ack(method.delivery_tag)
-        if properties.message_id == message_id:
-            found = True
-        else:
-            preserved.append((body, properties))
-
-    for body, properties in preserved:
-        channel.basic_publish(
-            exchange="",
-            routing_key=dlq,
-            body=body,
-            properties=properties,
-        )
+    try:
+        count = channel.queue_declare(queue=dlq, passive=True).method.message_count
+        for _ in range(count):
+            method, properties, body = channel.basic_get(queue=dlq, auto_ack=False)
+            if method is None:
+                break
+            if properties.message_id == message_id:
+                channel.basic_ack(method.delivery_tag)
+                found = True
+                break
+            preserved.append(method.delivery_tag)
+    finally:
+        for delivery_tag in preserved:
+            channel.basic_nack(delivery_tag, requeue=True)
     return found
 
 
@@ -163,12 +160,54 @@ def check_dlq(channel, queue_name, run_id):
     raise AssertionError(f"test message did not reach {dlq}")
 
 
+def check_end_to_end(channel, run_id):
+    source = f"__integration_e2e_{run_id}"
+    article_id = (run_id * 64)[:64]
+    now = datetime.now(timezone.utc).isoformat()
+    article = {
+        "article_id": article_id,
+        "source": source,
+        "title": "Bitcoin adoption gains",
+        "summary": "",
+        "url": "https://example.test/news",
+        "published_at": now,
+        "collected_at": now,
+    }
+    try:
+        channel.basic_publish(
+            exchange="",
+            routing_key=RAW_QUEUE,
+            body=json.dumps(article).encode(),
+            mandatory=True,
+            properties=pika.BasicProperties(delivery_mode=2),
+        )
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            with db_connection() as database:
+                with database.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT sentiment_label FROM news_articles WHERE article_id = %s",
+                        (article_id,),
+                    )
+                    row = cursor.fetchone()
+            if row:
+                assert row[0] == "positive", row
+                print("PASS end-to-end: raw queue -> analytics -> enriched queue -> MySQL")
+                return
+            time.sleep(0.5)
+        raise AssertionError("Valid article did not traverse the pipeline")
+    finally:
+        cleanup_database(article_id, source)
+
+
 def main():
     run_id = uuid.uuid4().hex[:12]
     check_idempotence(run_id)
-    connection = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
+    connection = pika.BlockingConnection(parameters())
     try:
         channel = connection.channel()
+        channel.confirm_delivery()
+        check_end_to_end(channel, uuid.uuid4().hex[:12])
         check_dlq(channel, RAW_QUEUE, run_id)
         check_dlq(channel, ANALYTICS_QUEUE, run_id)
     finally:
