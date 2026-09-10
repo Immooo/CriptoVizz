@@ -22,6 +22,7 @@ jobs:
       - run: bandit -r app -ll
       - run: python -m unittest discover -s tests -v
       - run: pip-audit -r app/scrap/requirements.txt -r app/analytics/requirements.txt -r app/queue/requirements.txt -r app/clean/requirements.txt
+      - run: bash tests/test_mysql_init.sh
       - run: python script/setup-env.py
       - run: docker compose config --quiet
       - run: docker compose up -d --build --wait --wait-timeout 180

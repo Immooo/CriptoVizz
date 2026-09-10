@@ -1,4 +1,6 @@
 #!/bin/sh
+# MySQL sources non-executable init scripts on Linux. Keep shell options local.
+(
 set -eu
 # Hex-only generated secrets avoid SQL interpolation and Compose escaping hazards.
 case "$GRAFANA_DB_PASSWORD" in *[!a-fA-F0-9]*|"") echo "GRAFANA_DB_PASSWORD must be hexadecimal" >&2; exit 1;; esac
@@ -8,3 +10,4 @@ CREATE USER IF NOT EXISTS 'grafana_reader'@'%' IDENTIFIED BY '$GRAFANA_DB_PASSWO
 ALTER USER 'grafana_reader'@'%' IDENTIFIED BY '$GRAFANA_DB_PASSWORD';
 GRANT SELECT ON \`$MYSQL_DATABASE\`.* TO 'grafana_reader'@'%';
 SQL
+)
