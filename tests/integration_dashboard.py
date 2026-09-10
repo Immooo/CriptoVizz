@@ -36,10 +36,12 @@ def epoch_ms(value):
     return int(datetime.fromisoformat(value).timestamp() * 1000)
 
 
-def execute(panel, auth, start, end, topic="bitcoin"):
+def execute(panel, auth, start, end, topic="bitcoin", fixtures=True):
     query = dict(panel["targets"][0])
     query.update(datasource=panel["datasource"], intervalMs=60000, maxDataPoints=1000)
-    query["rawSql"] = FIXTURES + query["rawSql"].replace("${topic:sqlstring}", "'" + topic + "'")
+    query["rawSql"] = (FIXTURES if fixtures else "") + query["rawSql"].replace(
+        "${topic:sqlstring}", "'" + topic + "'"
+    )
     payload = {"from": str(start), "to": str(end), "queries": [query]}
     request = urllib.request.Request(
         os.getenv("GRAFANA_TEST_URL", "http://localhost:3000") + "/api/ds/query",
@@ -96,6 +98,13 @@ def main():
     )
     assert sum(values(long_frames, "number")) == 7, "historical aggregates were lost"
     print("PASS long range: retained hourly aggregates")
+    import time
+
+    now = int(time.time() * 1000)
+    for hours in (1 / 12, 1, 6, 48):
+        for panel in panels:
+            execute(panel, auth, now - int(hours * 3600000), now, fixtures=False)
+        print(f"PASS real database schema: {hours:g}-hour range")
 
 
 if __name__ == "__main__":
