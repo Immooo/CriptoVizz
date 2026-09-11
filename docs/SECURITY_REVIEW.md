@@ -11,7 +11,7 @@ un projet local maintenable. Ce travail n’est ni un pentest externe, ni une ce
 
 | Priorité | Constat | Correction / statut |
 | --- | --- | --- |
-| Haute | Ancien `.env` publié dans le commit initial `362fb86f` | Plus suivi aujourd’hui ; mots de passe historiques différents des valeurs locales actuelles. Remplacer ces anciens secrets partout où ils auraient été réutilisés. Historique conservé. |
+| Haute | Ancien `.env` publié dans les premiers commits | Le fichier et les commits qui le contenaient ont été retirés de l’historique GitHub avant la publication publique. Les anciens mots de passe `epitech` doivent être considérés comme compromis et ne doivent jamais être réutilisés. |
 | Haute | Ports MySQL, RabbitMQ et Grafana ouverts sur toutes les interfaces | Publication limitée à `127.0.0.1`. |
 | Haute | Grafana accédait à MySQL avec le compte d’écriture | Compte `grafana_reader` limité à `SELECT`, script pour volumes neufs et migration documentée. |
 | Haute | Mots de passe d’exemple et compte RabbitMQ `guest` | Génération de secrets aléatoires, compte broker dédié, secrets requis par Compose. Les comptes existants nécessitent une migration. |
@@ -40,7 +40,7 @@ Le script d’initialisation historique est conservé ; un test impose leur éga
   confirme uniquement `SELECT` sur la base pour `grafana_reader`.
 - Protections effectives vérifiées : UID 10001, rootfs en lecture seule, capabilities supprimées.
 - Collecte réelle : 55 articles publiés lors d’un cycle de test.
-- `.env` exclu de Git et du contexte Docker ; inspection ciblée de son historique.
+- `.env` exclu de Git et du contexte Docker ; inspection de l’historique puis nettoyage des blobs historiques contenant ce fichier.
 
 La CI reprend lint, formatage, Bandit, tests unitaires, `pip-audit` et intégration
 Docker. Les résultats locaux ne prouvent pas à eux seuls le succès futur de GitHub Actions.
@@ -49,6 +49,8 @@ Docker. Les résultats locaux ne prouvent pas à eux seuls le succès futur de G
 
 - La pile déjà démarrée n’est pas migrée par un changement des fichiers : suivre
   [OPERATIONS.md](OPERATIONS.md), sauvegarder puis remplacer les comptes par défaut.
+- L’historique local antérieur peut encore exister dans des clones, reflogs ou caches : toute
+  personne ayant cloné l’ancien dépôt doit considérer les secrets comme compromis.
 - Pas de TLS entre services, de haute disponibilité, de quotas de queues ni de politique
   automatique de rétention des DLQ/agrégats. Aucun test de charge à grande échelle.
 - Le compte RabbitMQ initial possède les droits administrateur ; séparer les comptes
