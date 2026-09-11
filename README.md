@@ -153,3 +153,12 @@ recouvrent la période. Sans nouvel article dans la fenêtre, une absence de don
 
 `python tests/integration_dashboard.py` vérifie les requêtes via Grafana avec des données
 fictives en lecture seule : fenêtre de cinq minutes, limites temporelles, filtres et historique.
+
+### Lecture du dashboard
+
+La vue par défaut couvre six heures : trois indicateurs (articles uniques, sources actives,
+sentiment moyen), volumes empilés par thème, répartition globale du sentiment et tableau
+des actualités en pleine largeur. Débit et latence sont placés sous les actualités.
+Les volumes utilisent 1 minute jusqu’à 15 minutes, 5 minutes jusqu’à 1 heure,
+15 minutes jusqu’à 6 heures, puis au minimum une heure. Les indicateurs et la
+répartition portent sur les articles conservés, contrairement aux agrégats historiques.

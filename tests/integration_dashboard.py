@@ -78,10 +78,13 @@ def main():
     for panel in panels:
         frames = execute(panel, auth, start, end)
         timestamps = values(frames, "time")
-        if panel["id"] != 4:
+        if panel["type"] == "timeseries":
             assert timestamps and all(start <= t <= end for t in timestamps), panel["title"]
         if panel["id"] in (1, 3, 5):
             assert sum(values(frames, "number")) == 2, panel["title"]
+        if panel["id"] in (7, 8, 9):
+            expected = {7: 2, 8: 1, 9: 0}[panel["id"]]
+            assert values(frames, "number") == [expected], panel["title"]
         if panel["id"] == 4:
             strings = values(frames, "string")
             assert "inside-start" in strings and "inside-end" in strings, strings
@@ -91,7 +94,7 @@ def main():
             assert not values(execute(panel, auth, start, end, "ethereum"), "string")
         print("PASS five-minute range:", panel["title"])
     long_frames = execute(
-        panels[0],
+        next(panel for panel in panels if panel["id"] == 1),
         auth,
         epoch_ms("2026-01-01T00:00:00+00:00"),
         epoch_ms("2026-01-03T00:00:00+00:00"),

@@ -6,159 +6,151 @@
   "graphTooltip": 1,
   "panels": [
     {
+      "id": 7,
+      "type": "stat",
+      "title": "Articles publiés",
+      "description": "Nombre d’articles uniques publiés dans la période et les thèmes sélectionnés.",
       "datasource": {
         "type": "mysql",
         "uid": "mysql-crypto-news"
       },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 65,
-            "lineWidth": 2,
-            "showPoints": "always",
-            "pointSize": 5
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "bitcoin"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#73BF69",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "ethereum"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#B877D9",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "regulation"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#F2495C",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "defi"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#F2CC0C",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "security"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#3274D9",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "markets"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#8AB8FF",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "other"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#FF780A",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
       "gridPos": {
-        "h": 9,
-        "w": 12,
         "x": 0,
-        "y": 0
-      },
-      "id": 1,
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "y": 0,
+        "w": 8,
+        "h": 4
       },
       "targets": [
         {
-          "format": "time_series",
+          "refId": "A",
+          "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT GREATEST($__unixEpochFrom(), FLOOR(UNIX_TIMESTAMP(event_time) / (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 THEN 60 ELSE 3600 END))) * (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 THEN 60 ELSE 3600 END))) AS time, topic AS metric, SUM(article_count) AS value FROM (SELECT a.published_at AS event_time, CONVERT(t.topic USING utf8mb4) COLLATE utf8mb4_bin AS topic, 1 AS article_count, a.sentiment_score AS sentiment_sum FROM news_articles a JOIN JSON_TABLE(a.topics, '$[*]' COLUMNS(topic VARCHAR(80) PATH '$')) t WHERE $__timeFilter(a.published_at) AND ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 UNION ALL SELECT bucket_start AS event_time, CONVERT(topic USING utf8mb4) COLLATE utf8mb4_bin AS topic, article_count, sentiment_sum FROM analytics_hourly WHERE bucket_start <= $__timeTo() AND bucket_start + INTERVAL 1 HOUR > $__timeFrom() AND ($__unixEpochTo() - $__unixEpochFrom()) > 86400) samples WHERE topic IN (${topic:sqlstring}) GROUP BY 1, 2 ORDER BY 1",
-          "refId": "A"
+          "rawSql": "SELECT COUNT(*) AS value FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring}))"
         }
       ],
-      "title": "News volume by topic",
-      "type": "timeseries",
-      "description": "Up to 24 hours: exact publication-time filter with adaptive intervals (minimum 1 minute). Longer ranges use retained hourly aggregates; boundary hours may be partial. Articles may belong to several topics.",
-      "interval": "1m"
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8AB8FF"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Sources actives",
+      "description": "Nombre de sources ayant publié au moins un article dans la sélection.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-crypto-news"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT source) AS value FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring}))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "—",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8AB8FF"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Sentiment moyen",
+      "description": "Score lexical de −1 (négatif) à +1 (positif). Une heuristique, pas une prévision financière.",
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-crypto-news"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT AVG(sentiment_score) AS value FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring}))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 2,
+          "noValue": "—",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8AB8FF"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      }
     },
     {
       "datasource": {
@@ -168,15 +160,20 @@
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 15,
-            "lineWidth": 2,
-            "spanNulls": false,
-            "showPoints": "always",
-            "pointSize": 6
+            "drawStyle": "bars",
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "showPoints": "never",
+            "pointSize": 5,
+            "barWidthFactor": 0.85,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
           },
-          "max": 1,
-          "min": -1
+          "unit": "short",
+          "min": 0,
+          "decimals": 0
         },
         "overrides": [
           {
@@ -287,12 +284,12 @@
         ]
       },
       "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 0
+        "x": 0,
+        "y": 4,
+        "w": 16,
+        "h": 9
       },
-      "id": 2,
+      "id": 1,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -308,13 +305,13 @@
         {
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT GREATEST($__unixEpochFrom(), FLOOR(UNIX_TIMESTAMP(event_time) / (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 THEN 60 ELSE 3600 END))) * (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 THEN 60 ELSE 3600 END))) AS time, topic AS metric, SUM(sentiment_sum) / NULLIF(SUM(article_count), 0) AS value FROM (SELECT a.published_at AS event_time, CONVERT(t.topic USING utf8mb4) COLLATE utf8mb4_bin AS topic, 1 AS article_count, a.sentiment_score AS sentiment_sum FROM news_articles a JOIN JSON_TABLE(a.topics, '$[*]' COLUMNS(topic VARCHAR(80) PATH '$')) t WHERE $__timeFilter(a.published_at) AND ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 UNION ALL SELECT bucket_start AS event_time, CONVERT(topic USING utf8mb4) COLLATE utf8mb4_bin AS topic, article_count, sentiment_sum FROM analytics_hourly WHERE bucket_start <= $__timeTo() AND bucket_start + INTERVAL 1 HOUR > $__timeFrom() AND ($__unixEpochTo() - $__unixEpochFrom()) > 86400) samples WHERE topic IN (${topic:sqlstring}) GROUP BY 1, 2 ORDER BY 1",
+          "rawSql": "SELECT GREATEST($__unixEpochFrom(), FLOOR(UNIX_TIMESTAMP(event_time) / (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 900 THEN 60 WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 3600 THEN 300 WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 21600 THEN 900 ELSE 3600 END))) * (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 900 THEN 60 WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 3600 THEN 300 WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 21600 THEN 900 ELSE 3600 END))) AS time, topic AS metric, SUM(article_count) AS value FROM (SELECT a.published_at AS event_time, CONVERT(t.topic USING utf8mb4) COLLATE utf8mb4_bin AS topic, 1 AS article_count, a.sentiment_score AS sentiment_sum FROM news_articles a JOIN JSON_TABLE(a.topics, '$[*]' COLUMNS(topic VARCHAR(80) PATH '$')) t WHERE $__timeFilter(a.published_at) AND ($__unixEpochTo() - $__unixEpochFrom()) <= 86400 UNION ALL SELECT bucket_start AS event_time, CONVERT(topic USING utf8mb4) COLLATE utf8mb4_bin AS topic, article_count, sentiment_sum FROM analytics_hourly WHERE bucket_start <= $__timeTo() AND bucket_start + INTERVAL 1 HOUR > $__timeFrom() AND ($__unixEpochTo() - $__unixEpochFrom()) > 86400) samples WHERE topic IN (${topic:sqlstring}) GROUP BY 1, 2 ORDER BY 1",
           "refId": "A"
         }
       ],
-      "title": "Average sentiment over time",
+      "title": "Volume des actualités par thème",
       "type": "timeseries",
-      "description": "Up to 24 hours: exact publication-time filter with adaptive intervals (minimum 1 minute). Longer ranges use retained hourly aggregates; boundary hours may be partial. Articles may belong to several topics.",
+      "description": "Comptage par thème : 1 min jusqu’à 15 min, 5 min jusqu’à 1 h, 15 min jusqu’à 6 h, puis 1 h minimum. Un article peut avoir plusieurs thèmes. Au-delà de 24 h, agrégats horaires historiques.",
       "interval": "1m"
     },
     {
@@ -324,49 +321,102 @@
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "fillOpacity": 65,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            },
-            "drawStyle": "bars",
-            "showPoints": "always",
-            "pointSize": 5
-          },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "min": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Positif"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Neutre"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8AB8FF"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Negatif"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 9
+        "x": 16,
+        "y": 4,
+        "w": 8,
+        "h": 9
       },
       "id": 3,
       "options": {
+        "pieType": "donut",
+        "displayLabels": [
+          "percent"
+        ],
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "legend": {
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
         },
         "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single"
         }
       },
       "targets": [
         {
-          "format": "time_series",
+          "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT GREATEST($__unixEpochFrom(), FLOOR(UNIX_TIMESTAMP(published_at) / (GREATEST($__interval_ms / 1000, 60))) * (GREATEST($__interval_ms / 1000, 60))) AS time, SUM(sentiment_label = 'positive') AS positive, SUM(sentiment_label = 'neutral') AS neutral, SUM(sentiment_label = 'negative') AS negative FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring})) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT SUM(sentiment_label = 'positive') AS Positif, SUM(sentiment_label = 'neutral') AS Neutre, SUM(sentiment_label = 'negative') AS Negatif FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring}))",
           "refId": "A"
         }
       ],
-      "title": "Sentiment distribution",
-      "type": "timeseries",
-      "interval": "1m"
+      "title": "Répartition du sentiment",
+      "type": "piechart",
+      "interval": "1m",
+      "description": "Répartition des articles de la période sélectionnée. Chaque article est compté une seule fois, même avec plusieurs thèmes."
     },
     {
       "datasource": {
@@ -375,29 +425,136 @@
       },
       "fieldConfig": {
         "defaults": {},
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Publication"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Source"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sentiment"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Themes"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URL"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Titre"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URL"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Lire",
+                    "url": "${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 9
+        "x": 0,
+        "y": 13,
+        "w": 24,
+        "h": 11
       },
       "id": 4,
       "options": {
         "showHeader": true,
-        "cellHeight": "sm"
+        "cellHeight": "md"
       },
       "targets": [
         {
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT published_at AS Published, source AS Source, title AS Title, sentiment_label AS Sentiment, JSON_UNQUOTE(topics) AS Topics, url AS URL FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring})) ORDER BY published_at DESC LIMIT 100",
+          "rawSql": "SELECT published_at AS Publication, source AS Source, title AS Titre, sentiment_label AS Sentiment, JSON_UNQUOTE(topics) AS Themes, url AS URL FROM news_articles WHERE $__timeFilter(published_at) AND JSON_OVERLAPS(topics, JSON_ARRAY(${topic:sqlstring})) ORDER BY published_at DESC LIMIT 100",
           "refId": "A"
         }
       ],
-      "title": "Latest analyzed news",
-      "type": "table"
+      "title": "Dernières actualités",
+      "type": "table",
+      "description": "Articles conservés dans la fenêtre de rétention. Les indicateurs du haut et la répartition utilisent cette même sélection.",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Themes": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
+        }
+      ]
     },
     {
       "datasource": {
@@ -408,24 +565,32 @@
         "defaults": {
           "custom": {
             "drawStyle": "bars",
-            "fillOpacity": 65,
-            "showPoints": "always",
-            "pointSize": 5
+            "fillOpacity": 85,
+            "showPoints": "never",
+            "pointSize": 5,
+            "lineWidth": 0,
+            "barWidthFactor": 0.85,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
           },
-          "unit": "short"
+          "unit": "short",
+          "min": 0,
+          "decimals": 0
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 18
+        "y": 24,
+        "w": 12,
+        "h": 8
       },
       "id": 5,
       "options": {
         "legend": {
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -438,13 +603,13 @@
         {
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT GREATEST($__unixEpochFrom(), FLOOR(UNIX_TIMESTAMP(collected_at) / (GREATEST($__interval_ms / 1000, 60))) * (GREATEST($__interval_ms / 1000, 60))) AS time, source AS metric, COUNT(*) AS value FROM news_articles WHERE $__timeFilter(collected_at) GROUP BY 1, 2 ORDER BY 1",
+          "rawSql": "SELECT GREATEST($__unixEpochFrom(), FLOOR(UNIX_TIMESTAMP(collected_at) / (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 900 THEN 60 WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 3600 THEN 300 WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 21600 THEN 900 ELSE 3600 END))) * (GREATEST($__interval_ms / 1000, CASE WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 900 THEN 60 WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 3600 THEN 300 WHEN ($__unixEpochTo() - $__unixEpochFrom()) <= 21600 THEN 900 ELSE 3600 END))) AS time, source AS metric, COUNT(*) AS value FROM news_articles WHERE $__timeFilter(collected_at) GROUP BY 1, 2 ORDER BY 1",
           "refId": "A"
         }
       ],
-      "title": "Ingestion throughput by source",
+      "title": "Ingestion par source",
       "type": "timeseries",
-      "description": "Unique articles first collected during the selected period; repeated RSS polling is not counted again. Adaptive intervals, minimum 1 minute.",
+      "description": "Articles uniques collectés pour la première fois. Les relectures du même flux ne gonflent pas le débit. Intervalles adaptés à la période.",
       "interval": "1m"
     },
     {
@@ -455,8 +620,8 @@
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 15,
+            "drawStyle": "points",
+            "fillOpacity": 0,
             "lineWidth": 2,
             "showPoints": "always",
             "pointSize": 6,
@@ -467,10 +632,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
-        "y": 18
+        "y": 24,
+        "w": 12,
+        "h": 8
       },
       "id": 6,
       "options": {
@@ -492,9 +657,9 @@
           "refId": "A"
         }
       ],
-      "title": "Average pipeline latency by source (hourly)",
+      "title": "Latence du pipeline · moyenne horaire",
       "type": "timeseries",
-      "description": "Hourly averages for all hour buckets overlapping the selected period. This metric is stored hourly and cannot provide an exact five-minute average.",
+      "description": "Moyenne des blocs horaires recouvrant la période. La précision inférieure à une heure n’est pas stockée.",
       "interval": "1m"
     }
   ],
@@ -529,12 +694,12 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Crypto News Analytics",
   "uid": "crypto-news-analytics",
-  "version": 3
+  "version": 4
 }
