@@ -4,5 +4,5 @@
 -r app/clean/requirements.txt
 ruff==0.16.6
 pip-audit==2.10.1
-PyYAML==6.0.3
+PyYAML==6.0.4
 bandit==1.9.4
